@@ -28,7 +28,6 @@ async function run() {
         F: new F3g("0xFFFFFFFF00000001"),
         pil2: true,
         optImPols: argv.impols || false,
-        skipConstTree: true,
     };
 
     const airout = new AirOut(argv.airout);
