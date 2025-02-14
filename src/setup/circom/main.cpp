@@ -282,7 +282,7 @@ extern "C" __attribute__((visibility("default"))) uint64_t getSizeWitness()  {
   return get_size_of_witness();
 }
 
-extern "C" __attribute__((visibility("default"))) void getWitness(void *zkin, char* datFile, void* pWitness, uint64_t nMutexes)  {
+extern "C" __attribute__((visibility("default"))) void getWitnessFinal(void *zkin, char* datFile, void* pWitness, uint64_t nMutexes)  {
     //-------------------------------------------
     // Verifier stark proof
     //-------------------------------------------
@@ -297,6 +297,35 @@ extern "C" __attribute__((visibility("default"))) void getWitness(void *zkin, ch
       cout << "Not all inputs have been set. Only " << to_string(get_main_input_signal_no() - ctx->getRemaingInputsToBeSet()) << " out of " << to_string(get_main_input_signal_no()) << endl;
       exit(-1);
     }
+
+    for(uint64_t i = 0; i < get_main_input_signal_no(); ++i) {
+      cout << i << " " << ctx->signalValues[get_main_input_signal_start() + i] << endl;
+    }
+
+    //-------------------------------------------
+    // Compute witness
+    //------------------------------------------- 
+    uint64_t *witness = (uint64_t *)pWitness;
+    uint64_t sizeWitness = get_size_of_witness();
+    for (uint64_t i = 0; i < sizeWitness; i++)
+    {
+      ctx->getWitness(i, witness[i]);
+    }
+    
+    delete ctx;
+    freeCircuit(circuit);
+}
+
+extern "C" __attribute__((visibility("default"))) void getWitness(uint64_t *proof, char* datFile, void* pWitness, uint64_t nMutexes)  {
+    //-------------------------------------------
+    // Verifier stark proof
+    //-------------------------------------------
+    Circom_Circuit *circuit = loadCircuit(string(datFile));
+
+    Circom_CalcWit *ctx = new Circom_CalcWit(circuit, nMutexes);
+
+    memcpy(&ctx->signalValues[get_main_input_signal_start()], proof, get_main_input_signal_no() * sizeof(uint64_t));
+    ctx->runCircuit();
 
     //-------------------------------------------
     // Compute witness
