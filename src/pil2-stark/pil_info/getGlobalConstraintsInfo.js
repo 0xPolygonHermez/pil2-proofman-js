@@ -4,7 +4,7 @@ const { addInfoExpressions } = require("./helpers/helpers");
 const { formatHints } = require("./helpers/pil2/utils");
 const { formatExpressions, formatSymbols } = require("./helpers/pil2/utils");
 
-module.exports.getGlobalConstraintsInfo = function getGlobalConstraintsInfo(pilout) {
+module.exports.getGlobalConstraintsInfo = function getGlobalConstraintsInfo(res, pilout) {
     
     let saveSymbols = pilout.symbols ? false : true;
     let expressions, symbols;
@@ -49,7 +49,6 @@ module.exports.getGlobalConstraintsInfo = function getGlobalConstraintsInfo(pilo
 
     if(globalHints) {
         const hints = formatHints(pilout, globalHints, symbols, expressions, saveSymbols, true);
-        const res = {};
         hintsCode = addHintsInfo(res, expressions, hints, true);
     }
     return {constraints: constraintsCode, hints: hintsCode };

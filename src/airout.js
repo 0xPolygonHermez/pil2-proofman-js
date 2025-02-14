@@ -159,12 +159,6 @@ class AirOut {
         return this.symbols.filter(symbol => symbol.airGroupId === airgroupId && symbol.type === SYMBOL_TYPES.AIRGROUP_VALUE && symbol.airId === undefined);
     }
 
-    getProofValues() {
-        if(this.symbols === undefined) return [];
-
-        return this.symbols.filter(symbol => symbol.type === SYMBOL_TYPES.PROOF_VALUE);
-    }
-
     getSymbolsByAirId(airId) {
         if(this.symbols === undefined) return [];
 

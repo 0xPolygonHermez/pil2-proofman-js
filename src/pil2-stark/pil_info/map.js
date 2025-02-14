@@ -1,7 +1,7 @@
 const { printExpressions } = require("./helpers/pil2/utils");
 
 module.exports = function map(res, symbols, expressions, constraints, options) {
-    mapSymbols(res, symbols);
+    module.exports.mapSymbols(res, symbols);
     setStageInfoSymbols(res, symbols);
 
     for(let i = 0; i < constraints.length; ++i) {
@@ -35,7 +35,7 @@ module.exports = function map(res, symbols, expressions, constraints, options) {
     res.nCommitmentsStage1 = res.cmPolsMap.filter(p => p.stage === "cm1" && !p.imPol).length; 
 }
 
-function mapSymbols(res, symbols) {
+module.exports.mapSymbols = function mapSymbols(res, symbols) {
     for(let i = 0; i < symbols.length; ++i) {
     let symbol = symbols[i];
         if(["witness", "fixed", "custom"].includes(symbol.type)) {

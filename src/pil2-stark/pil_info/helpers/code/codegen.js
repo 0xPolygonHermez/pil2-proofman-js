@@ -74,13 +74,13 @@ function evalExp(ctx, symbols, expressions, exp, prime) {
     } else if (exp.op === "public") {
         return { type: exp.op, id: exp.id, dim: 1}
     } else if (exp.op === "proofvalue") {
-        return { type: exp.op, id: exp.id, dim: exp.dim}
+        return { type: exp.op, id: exp.id, stage: exp.stage, dim: exp.dim}
     } else if (exp.op == "number") {
         return { type: exp.op, value: exp.value.toString(), dim: 1 }
     } else if ("eval" === exp.op) {
         return { type: exp.op, id: exp.id, dim: exp.dim}
     } else if (["airgroupvalue", "airvalue"].includes(exp.op)) {
-        return { type: exp.op, id: exp.id, dim: exp.dim, airgroupId: exp.airgroupId };
+        return { type: exp.op, id: exp.id, stage: exp.stage, dim: exp.dim, airgroupId: exp.airgroupId };
     } else if (exp.op == "xDivXSubXi") {
         return { type: exp.op, id: exp.id, opening: exp.opening, dim: 3 }
     } else if (exp.op == "Zi") {

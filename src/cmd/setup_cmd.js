@@ -114,7 +114,6 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     
     if(proofManagerConfig.setup && proofManagerConfig.setup.genAggregationSetup) {
         const airoutInfo = await setAiroutInfo(airout, starkStructs);
-        airoutInfo.vadcopInfo.publicsMap = setup[0][0].starkInfo.publicsMap;
         globalConstraints = airoutInfo.globalConstraints;
         globalInfo = airoutInfo.vadcopInfo;
                 
@@ -241,7 +240,6 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         
     } else {
         const airoutInfo = await setAiroutInfo(airout, starkStructs);
-        airoutInfo.vadcopInfo.publicsMap = setup[0][0].starkInfo.publicsMap;
         globalInfo = airoutInfo.vadcopInfo;
         globalConstraints = airoutInfo.globalConstraints;
     }
