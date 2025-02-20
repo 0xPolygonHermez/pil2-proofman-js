@@ -1,5 +1,7 @@
 const fs =require("fs");
 const { getGlobalConstraintsInfo } = require("../pil2-stark/pil_info/getGlobalConstraintsInfo");
+const { formatSymbols } = require("../pil2-stark/pil_info/helpers/pil2/utils");
+const { mapSymbols } = require("../pil2-stark/pil_info/map");
 
 async function fileExists(path) {
     return fs.promises.access(path, fs.constants.F_OK)
@@ -83,15 +85,25 @@ async function setAiroutInfo(airout, starkStructs) {
 
     vadcopInfo.numProofValues = airout.numProofValues;
 
-    let proofValues = airout.getProofValues();
-    vadcopInfo.proofValuesMap = proofValues.map(p => { return {name: p.name, id: p.id, stage: p.stage }})
+    let symbols = formatSymbols(airout, true);
+    
+    const res = {
+        publicsMap: [],
+        proofValuesMap: [],
+        airgroupValuesMap: [],
+        challengesMap: [],
+    };
+    mapSymbols(res, symbols);
+
+    vadcopInfo.proofValuesMap = res.proofValuesMap;
+    vadcopInfo.publicsMap = res.publicsMap;
 
     let globalConstraints = {
         constraints: [],
         hints: [],
     };
     if(airout.constraints !== undefined) {
-        globalConstraints = getGlobalConstraintsInfo(airout, true);
+        globalConstraints = getGlobalConstraintsInfo(res, airout, true);
     }
 
     return { vadcopInfo, globalConstraints };

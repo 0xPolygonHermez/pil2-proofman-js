@@ -354,7 +354,7 @@ module.exports.formatSymbols = function formatSymbols(pilout, global = false) {
                 }
             } else {
                 const multiArraySymbols = [];
-                generateMultiArraySymbols(multiArraySymbols, [], s, "proofvalue", undefined, dim, s.id, 0);
+                generateMultiArraySymbols(multiArraySymbols, [], s, "proofvalue", s.stage, dim, s.id, 0);
                 return multiArraySymbols;
             }
         } else if(s.type === piloutTypes.CHALLENGE) {

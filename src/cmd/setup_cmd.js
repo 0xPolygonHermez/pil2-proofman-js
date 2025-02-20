@@ -31,14 +31,13 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         F: new F3g("0xFFFFFFFF00000001"),
         pil2: true,
         optImPols: (proofManagerConfig.setup && proofManagerConfig.setup.optImPols) || false,
-        skipConstTree: (proofManagerConfig.setup && proofManagerConfig.setup.constTree !== undefined) ? true : false,
-        constTree: proofManagerConfig.setup && proofManagerConfig.setup.constTree !== undefined ? proofManagerConfig.setup.constTree : undefined,
+        constTree: path.resolve(__dirname, '../setup/build/bctree'),
         publicsInfo: proofManagerConfig.setup && proofManagerConfig.setup.publicsInfo,
         powersOfTauFile: proofManagerConfig.setup && proofManagerConfig.setup.powersOfTauFile,
-        fflonkSetup: proofManagerConfig.setup && proofManagerConfig.setup.fflonkSetup,
+        fflonkSetup: path.resolve(__dirname, '../setup/build/fflonkSetup'),
         binFiles: proofManagerConfig.setup && proofManagerConfig.setup.binFiles,
     };
-
+    
     let setup = [];
 
     let starkStructs = [];
@@ -98,7 +97,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             await fs.promises.writeFile(path.join(filesDir, `${air.name}.expressionsinfo.json`), JSON.stringify(setup[airgroup.airgroupId][air.airId].expressionsInfo, null, 1), "utf8");
 
             console.log("Computing Constant Tree...");
-            const { stdout } = await exec(`${proofManagerConfig.setup.constTree} -c ${path.join(filesDir, `${air.name}.const`)} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -v ${path.join(filesDir, `${air.name}.verkey.json`)}`);
+            const { stdout } = await exec(`${setupOptions.constTree} -c ${path.join(filesDir, `${air.name}.const`)} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -v ${path.join(filesDir, `${air.name}.verkey.json`)}`);
             console.log(stdout);
             setup[airgroup.airgroupId][air.airId].constRoot = JSONbig.parse(await fs.promises.readFile(path.join(filesDir, `${air.name}.verkey.json`), "utf8"));
 
@@ -115,7 +114,6 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     
     if(proofManagerConfig.setup && proofManagerConfig.setup.genAggregationSetup) {
         const airoutInfo = await setAiroutInfo(airout, starkStructs);
-        airoutInfo.vadcopInfo.publicsMap = setup[0][0].starkInfo.publicsMap;
         globalConstraints = airoutInfo.globalConstraints;
         globalInfo = airoutInfo.vadcopInfo;
                 
@@ -242,7 +240,6 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         
     } else {
         const airoutInfo = await setAiroutInfo(airout, starkStructs);
-        airoutInfo.vadcopInfo.publicsMap = setup[0][0].starkInfo.publicsMap;
         globalInfo = airoutInfo.vadcopInfo;
         globalConstraints = airoutInfo.globalConstraints;
     }
