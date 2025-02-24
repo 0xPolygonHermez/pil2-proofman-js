@@ -246,7 +246,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
 
     await fs.promises.writeFile(`${buildDir}/provingKey/pilout.globalInfo.json`, JSON.stringify(globalInfo, null, 1), "utf8");
     await fs.promises.writeFile(`${buildDir}/provingKey/pilout.globalConstraints.json`, JSON.stringify(globalConstraints, null, 1), "utf8");
-    await writeGlobalConstraintsBinFile(globalConstraints, `${buildDir}/provingKey/pilout.globalConstraints.bin`);
+    await writeGlobalConstraintsBinFile(globalInfo, globalConstraints, `${buildDir}/provingKey/pilout.globalConstraints.bin`);
 
     return { setup, airoutInfo: {...globalInfo, globalConstraints}, config: proofManagerConfig };
 }

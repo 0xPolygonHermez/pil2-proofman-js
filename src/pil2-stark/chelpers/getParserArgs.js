@@ -9,29 +9,52 @@ const operationsTypeMap = {
 
 
 const operationsMap = {
-    "commit1": 1,
-    "x": 1,
-    "Zi": 1,
-    "const": 1,
-    "custom1": 1,
-    "tmp1": 2,
-    "public": 3,
-    "number": 4,
-    "airvalue1": 5,
-    "proofvalue1": 6,
-    "custom3": 7,
-    "commit3": 7,
-    "xDivXSubXi": 7,
-    "tmp3": 8,
-    "airvalue3": 9,
-    "airgroupvalue": 10,
-    "proofvalue": 11,
-    "proofvalue3": 11,
-    "challenge": 12, 
-    "eval": 13,
+    "commit1": 0,
+    "x": 0,
+    "Zi": 0,
+    "const": 0,
+    "custom1": 0,
+    "tmp1": 1,
+    "public": 2,
+    "number": 3,
+    "airvalue1": 4,
+    "proofvalue1": 5,
+    "custom3": 6,
+    "commit3": 6,
+    "xDivXSubXi": 6,
+    "tmp3": 7,
+    "airvalue3": 8,
+    "airgroupvalue": 9,
+    "proofvalue": 10,
+    "proofvalue3": 10,
+    "challenge": 11, 
+    "eval": 12,
 }
 
-module.exports.getParserArgs = function getParserArgs(starkInfo, operations, codeInfo, numbers = [], global = false, verify = false) {
+const operationsMapParser = {
+    "commit1": 0,
+    "x": 0,
+    "Zi": 0,
+    "const": 0,
+    "custom1": 0,
+    "custom3": 0,
+    "commit3": 0,
+    "xDivXSubXi": 0,
+    "tmp1": 1,
+    "public": 2,
+    "number": 3,
+    "airvalue1": 4,
+    "airvalue3": 4,
+    "proofvalue1": 5,
+    "proofvalue": 5,
+    "proofvalue3": 5,
+    "tmp3": 6,
+    "airgroupvalue": 7,
+    "challenge": 8, 
+    "eval": 9,
+}
+
+module.exports.getParserArgs = function getParserArgs(starkInfo, operations, codeInfo, numbers = [], global = false, verify = false, globalInfo = {}) {
 
     var ops = [];
     var args = [];
@@ -56,12 +79,12 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
 
         if(operation.op !== "copy") args.push(operationsTypeMap[operation.op]);
 
-        pushArgs(r.dest, r.dest.type, true, verify);
+        pushArgs(r.dest, r.dest.type, true, operation.dest_type, verify);
         for(let i = 0; i < operation.src.length; i++) {
-            pushArgs(operation.src[i], operation.src[i].type, false, verify);
+            pushArgs(operation.src[i], operation.src[i].type, false, operation[`src${i}_type`], verify);
         }
 
-        let opsIndex = operations.findIndex(op => !op.op && op.dest_type === operation.dest_type && op.src0_type === operation.src0_type && op.src1_type === operation.src1_type);
+        let opsIndex = operations.findIndex(op => !op.op && op.dest_type === operation.dest_dim && op.src0_type === operation.src0_dim && op.src1_type === operation.src1_dim);
         if (opsIndex === -1) throw new Error("Operation not considered: " + JSON.stringify(operation));
 
         ops.push(opsIndex);
@@ -100,20 +123,23 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
     
     return {expsInfo};
 
-    function pushArgs(r, type, dest, verify) {
+    function pushArgs(r, type, dest, operationType, verify) {
         if(dest && !["tmp", "cm"].includes(r.type)) throw new Error("Invalid reference type set: " + r.type);
         
+        args.push(operationsMapParser[operationType]);        
         switch (type) {
             case "tmp": {
+                if(!global) args.push(0);
                 if (r.dim == 1) {
                     args.push(ID1D[r.id]);
                 } else {
                     assert(r.dim == 3);
-                    args.push(ID3D[r.id]);
+                    args.push(3*ID3D[r.id]);
                 }
                 break;
             }
             case "const": {
+                if(global) throw new Error("const pols should not appear in a global constraint");
                 const primeIndex = starkInfo.openingPoints.findIndex(p => p === r.prime);
                 if(primeIndex == -1) throw new Error("Something went wrong");
 
@@ -128,6 +154,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 break;
             }
             case "custom": {
+                if(global) throw new Error("custom pols should not appear in a global constraint");
                 const primeIndex = starkInfo.openingPoints.findIndex(p => p === r.prime);
                 if(primeIndex == -1) throw new Error("Something went wrong");
 
@@ -141,7 +168,8 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
 
                 break;
             }
-            case "cm": {        
+            case "cm": {    
+                if(global) throw new Error("witness pols should not appear in a global constraint");
                 const primeIndex = starkInfo.openingPoints.findIndex(p => p === r.prime);
                 if(primeIndex == -1) throw new Error("Something went wrong");
         
@@ -158,28 +186,44 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 let num = BigInt(r.value);
                 if(num < 0n) num += BigInt(0xFFFFFFFF00000001n);
                 let numString = `${num.toString()}`;
-                if(!numbers.includes(numString)) numbers.push(numString); 
+                if(!numbers.includes(numString)) numbers.push(numString);
+                if(!global) args.push(0);
                 args.push(numbers.indexOf(numString));
                 break;
             }
-            case "public":
-            case "eval": 
-            case "proofvalue":
-            case "airvalue":
-            case "challenge": {
+            case "public": {
+                if(!global) args.push(0);
                 args.push(r.id);
                 break;
             }
+            case "eval":            
+            case "airvalue": {
+                if(global) throw new Error("evals and airvalues should not appear in a global constraint");
+                args.push(0);
+                args.push(3*r.id);
+                break;
+            }
+            case "proofvalue":
+            case "challenge": {
+                if(!global) args.push(0);
+                args.push(3*r.id);
+                break;
+            }
             case "airgroupvalue": {
+                if(!global) args.push(0);
                 if(!global) {
-                    args.push(r.id);
+                    args.push(3*r.id);
                 } else {
-                    args.push(r.airgroupId);
-                    args.push(r.id);
+                    let offset = 0;
+                    for(let i = 0; i < r.airgroupId; ++i) {
+                        offset += 3 * globalInfo.aggTypes[i].length;
+                    }
+                    args.push(offset + 3*r.id);
                 }
                 break;
             }
             case "xDivXSubXi":
+                if(global) throw new Error("xDivXSub should not appear in a global constraint");
                 if(verify) {
                     args.push(nStages);
                     args.push(3*r.id);
@@ -189,6 +233,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 }
                 break;
             case "Zi": {
+                if(global) throw new Error("Zerofier polynomial should not appear in a global constraint");
                 if(verify) {
                     args.push(nStages);
                     args.push(3 + 3*r.boundaryId);
@@ -199,6 +244,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 break;
             }
             case "x": {
+                if(global) throw new Error("X should not appear in a global constraint");
                 if(verify) {
                     args.push(nStages);
                     args.push(0);
@@ -210,6 +256,13 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
             }
             default: 
                 throw new Error("Unknown type " + type);
+        }
+        if(!dest) {
+            if(["number", "public", "eval", "airvalue", "proofvalue", "challenge", "airgroupvalue"].includes(type)) {
+                args.push(1);
+            } else {
+                args.push(0);
+            }
         }
     }
 
@@ -241,6 +294,8 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
         } else {
             _op.dest_type = r.dest.type;
         }
+
+        _op.dest_dim = `dim${r.dest.dim}`;
         
         _op.src = [...r.src];
         
@@ -255,6 +310,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
     
         for(let i = 0; i < _op.src.length; i++) {
             _op[`src${i}_type`] = getType(_op.src[i], verify);
+            _op[`src${i}_dim`] = `dim${_op.src[i].dim}`;
         }
         
         return _op;
