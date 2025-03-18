@@ -263,7 +263,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 if(!global) {
                     let airGroupValuePos = 0;
                     for(let i = 0; i < r.id; ++i) {
-                        airGroupValuePos += starkInfo.airGroupValuesMap[i].stage == 1 ? 1 : 3;
+                        airGroupValuePos += starkInfo.airgroupValuesMap[i].stage == 1 ? 1 : 3;
                     }
                     args.push(airGroupValuePos);
                 } else {
