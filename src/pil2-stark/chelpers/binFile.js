@@ -30,7 +30,7 @@ module.exports.writeVerifierExpressionsBinFile = async function writeVerifierExp
 
     const cHelpersBin = await createBinFile(cHelpersFilename, "chps", 1, 2, 1 << 22, 1 << 24);
 
-    await writeExpressionsSection(cHelpersBin, verInfo.expsInfo, binFileInfo.numbersExps, binFileInfo.maxTmp1, binFileInfo.maxTmp3, 2, true);
+    await writeExpressionsSection(cHelpersBin, verInfo.expsInfo, binFileInfo.numbersExps, binFileInfo.maxTmp1, binFileInfo.maxTmp3, binFileInfo.maxArgs, binFileInfo.maxOps, 2, true);
 
     console.log("> Writing the chelpers file finished");
     console.log("---------------------------------------------");
@@ -49,7 +49,7 @@ module.exports.writeExpressionsBinFile = async function writeExpressionsBinFile(
 
     const cHelpersBin = await createBinFile(cHelpersFilename, "chps", 1, CHELPERS_NSECTIONS, 1 << 22, 1 << 24);    
         
-    await writeExpressionsSection(cHelpersBin, expsInfo, binFileInfo.numbersExps, binFileInfo.maxTmp1, binFileInfo.maxTmp3, CHELPERS_EXPRESSIONS_SECTION);
+    await writeExpressionsSection(cHelpersBin, expsInfo, binFileInfo.numbersExps, binFileInfo.maxTmp1, binFileInfo.maxTmp3, binFileInfo.maxArgs, binFileInfo.maxOps, CHELPERS_EXPRESSIONS_SECTION);
 
     await writeConstraintsSection(cHelpersBin, constraintsInfo, binFileInfo.numbersConstraints, CHELPERS_CONSTRAINTS_DEBUG_SECTION);
 
@@ -61,7 +61,7 @@ module.exports.writeExpressionsBinFile = async function writeExpressionsBinFile(
     await cHelpersBin.close();
 }
 
-async function writeExpressionsSection(cHelpersBin, expressionsInfo, numbersExps, maxTmp1, maxTmp3, section) {
+async function writeExpressionsSection(cHelpersBin, expressionsInfo, numbersExps, maxTmp1, maxTmp3, maxArgs, maxOps, section) {
     console.log(`··· Writing Section ${section}. CHelpers expressions section`);
 
     const nCustomCommits = expressionsInfo[0].customValuesIds.length;
@@ -153,6 +153,8 @@ async function writeExpressionsSection(cHelpersBin, expressionsInfo, numbersExps
     
     await cHelpersBin.writeULE32(maxTmp1);
     await cHelpersBin.writeULE32(maxTmp3);
+    await cHelpersBin.writeULE32(maxArgs);
+    await cHelpersBin.writeULE32(maxOps);
     await cHelpersBin.writeULE32(opsExpressions.length);
     await cHelpersBin.writeULE32(argsExpressions.length);
     await cHelpersBin.writeULE32(numbersExps.length);
@@ -575,6 +577,8 @@ async function prepareExpressionsBin(starkInfo, expressionsInfo) {
 
     let maxTmp1 = 0;
     let maxTmp3 = 0;
+    let maxArgs = 0;
+    let maxOps = 0;
 
     // Get parser args for each constraint
     for(let j = 0; j < expressionsInfo.constraints.length; ++j) {
@@ -606,6 +610,8 @@ async function prepareExpressionsBin(starkInfo, expressionsInfo) {
 
         if(constraintInfo.nTemp1 > maxTmp1) maxTmp1 = constraintInfo.nTemp1;
         if(constraintInfo.nTemp3 > maxTmp3) maxTmp3 = constraintInfo.nTemp3;
+        if(constraintInfo.args.length > maxArgs) maxArgs = constraintInfo.args.length;
+        if(constraintInfo.ops.length > maxOps) maxOps = constraintInfo.ops.length;
     }
 
     // Get parser args for each expression
@@ -624,10 +630,12 @@ async function prepareExpressionsBin(starkInfo, expressionsInfo) {
 
         if(expInfo.nTemp1 > maxTmp1) maxTmp1 = expInfo.nTemp1;
         if(expInfo.nTemp3 > maxTmp3) maxTmp3 = expInfo.nTemp3;
+        if(expInfo.args.length > maxArgs) maxArgs = expInfo.args.length;
+        if(expInfo.ops.length > maxOps) maxOps = expInfo
     }
     
     const res = {
-        expsInfo, constraintsInfo, hintsInfo: expressionsInfo.hintsInfo, numbersExps, numbersConstraints, maxTmp1, maxTmp3
+        expsInfo, constraintsInfo, hintsInfo: expressionsInfo.hintsInfo, numbersExps, numbersConstraints, maxTmp1, maxTmp3, maxArgs, maxOps
     };
 
     return res;
@@ -639,17 +647,23 @@ async function prepareVerifierExpressionsBin(starkInfo, verifierInfo) {
 
     let maxTmp1 = 0;
     let maxTmp3 = 0;
+    let maxArgs = 0;
+    let maxOps = 0;
     let numbersExps = [];
     let {expsInfo: qCode} = getParserArgs(starkInfo, operations, verifierInfo.qVerifier, numbersExps, false, true, true);
     qCode.expId = starkInfo.cExpId;
     qCode.line = "";
     if (qCode.nTemp1 > maxTmp1) maxTmp1 = qCode.nTemp1;
     if (qCode.nTemp3 > maxTmp3) maxTmp3 = qCode.nTemp3;
+    if (qCode.args.length > maxArgs) maxArgs = qCode.args.length;
+    if (qCode.ops.length > maxOps) maxOps = qCode.ops.length;
     let {expsInfo: queryCode} = getParserArgs(starkInfo, operations, verifierInfo.queryVerifier, numbersExps, false, true);
     queryCode.expId = starkInfo.friExpId;
     queryCode.line = "";
     if (queryCode.nTemp1 > maxTmp1) maxTmp1 = queryCode.nTemp1;
     if (queryCode.nTemp3 > maxTmp3) maxTmp3 = queryCode.nTemp3;
+    if (queryCode.args.length > maxArgs) maxArgs = queryCode.args.length;
+    if (queryCode.ops.length > maxOps) maxOps = queryCode.ops.length;
    
-    return {qCode, queryCode, numbersExps, maxTmp1, maxTmp3};
+    return {qCode, queryCode, numbersExps, maxTmp1, maxTmp3, maxArgs, maxOps};
 }
