@@ -151,7 +151,6 @@ async function writeExpressionsSection(cHelpersBin, expressionsInfo, numbersExps
          
     }
     
-    console.log("MAX TMPS", maxTmp1, maxTmp3);
     await cHelpersBin.writeULE32(maxTmp1);
     await cHelpersBin.writeULE32(maxTmp3);
     await cHelpersBin.writeULE32(opsExpressions.length);
