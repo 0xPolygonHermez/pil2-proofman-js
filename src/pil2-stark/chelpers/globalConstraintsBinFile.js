@@ -7,7 +7,7 @@ const { getParserArgs } = require("./getParserArgs.js");
 const { getGlobalOperations } = require("./utils.js");
 const { writeStringToFile } = require("./binFile.js");
 
-module.exports.writeGlobalConstraintsBinFile = async function writeGlobalConstraintsBinFile(globalConstraintsInfo, globalConstraintsFilename) {    
+module.exports.writeGlobalConstraintsBinFile = async function writeGlobalConstraintsBinFile(globalInfo, globalConstraintsInfo, globalConstraintsFilename) {    
     const globalConstraintsBin = await createBinFile(globalConstraintsFilename, "chps", 1, GLOBAL_CONSTRAINTS_NSECTIONS, 1 << 22, 1 << 24);    
 
     const constraintsInfo = [];
@@ -18,7 +18,7 @@ module.exports.writeGlobalConstraintsBinFile = async function writeGlobalConstra
 
     // Get parser args for each constraint
     for(let j = 0; j < globalConstraintsInfo.constraints.length; ++j) {
-        const constraintInfo = getParserArgs({}, operations, globalConstraintsInfo.constraints[j], numbers, true).expsInfo;
+        const constraintInfo = getParserArgs({}, operations, globalConstraintsInfo.constraints[j], numbers, true, false, globalInfo).expsInfo;
         constraintInfo.line = globalConstraintsInfo.constraints[j].line;
         constraintsInfo.push(constraintInfo);
     }

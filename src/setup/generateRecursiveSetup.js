@@ -117,11 +117,6 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
             rootCRecursive2: setup.constRoot,
         }
         await fs.promises.writeFile(`${filesDir}/${template}.vks.json`, JSONbig.stringify(vks, 0, 1), "utf8");
-        
-        if(globalInfo.aggTypes.length > 1) {
-            const nullProof = genNullProof(setup.starkInfo);
-            await fs.promises.writeFile(`${buildDir}/provingKey/${globalInfo.name}/${airgroupName}/recursive2/recursive2.null_zkin.json`, JSON.stringify(nullProof, 0, 1), "utf8");
-        }
     }
 
     return { constRoot: setup.constRoot, starkInfo: setup.starkInfo, verifierInfo: setup.verifierInfo, pil: pilStr }

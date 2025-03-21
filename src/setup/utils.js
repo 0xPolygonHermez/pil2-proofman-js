@@ -30,6 +30,9 @@ function generateStarkStruct(settings, nBits) {
         starkStruct.merkleTreeArity = settings.merkleTreeArity || 16;
         starkStruct.merkleTreeCustom = settings.merkleTreeCustom || false;
         hashCommits = false;
+    } else {
+        starkStruct.merkleTreeArity = 3;
+        starkStruct.merkleTreeCustom = true;
     }
     
     starkStruct.hashCommits = hashCommits;
