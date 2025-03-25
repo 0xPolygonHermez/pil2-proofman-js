@@ -98,7 +98,7 @@ function formatExpression(exp, pilout, symbols, saveSymbols = false, global = fa
     if(op === "expression") {
         const id = exp[op].idx;
         const expOp = Object.keys(pilout.expressions[id])[0];
-        if(expOp != "mul" && Object.keys(pilout.expressions[id][expOp].lhs)[0] !== "expression" && Object.keys(pilout.expressions[id][expOp].rhs)[0] === "constant" && P.buf2bint(pilout.expressions[id][expOp].rhs.constant.value).toString() === "0") {
+        if(expOp != "mul" && expOp!= "neg" && Object.keys(pilout.expressions[id][expOp].lhs)[0] !== "expression" && Object.keys(pilout.expressions[id][expOp].rhs)[0] === "constant" && P.buf2bint(pilout.expressions[id][expOp].rhs.constant.value).toString() === "0") {
             return formatExpression(pilout.expressions[id][expOp].lhs, pilout, symbols, saveSymbols, global);
         }
         exp = { op: "exp", id };
