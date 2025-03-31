@@ -3,6 +3,7 @@ const { createBinFile,
     startWriteSection
      } = require("@iden3/binfileutils");
 const { getParserArgs } = require("./getParserArgs.js");
+const { getParserArgsPil1 } = require("./getParserArgsPil1.js");
 const { getAllOperations } = require("./utils.js");
 
 const CHELPERS_NSECTIONS = 4;
@@ -601,6 +602,10 @@ async function prepareExpressionsBin(starkInfo, expressionsInfo) {
         } else throw new Error("Invalid boundary: " + constraintCode.boundary);
 
         const {expsInfo: constraintInfo} = getParserArgs(starkInfo, operations, constraintCode, numbersConstraints);
+
+        // const {expsInfo: constraintInfo} = starkInfo.pil2 
+        //     ? getParserArgs(starkInfo, operations, constraintCode, numbersConstraints)
+        //     : getParserArgsPil1(starkInfo, operations, constraintCode, numbersConstraints);
         constraintInfo.stage = constraintCode.stage;
         constraintInfo.firstRow = firstRow;
         constraintInfo.lastRow = lastRow;
