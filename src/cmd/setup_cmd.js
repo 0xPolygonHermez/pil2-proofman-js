@@ -48,21 +48,6 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         await readFixedPolsBin(fixedInfo, setupOptions.binFiles[i], setupOptions.F);
     }
 
-    let minFinalDegree = 5;
-    for(const airgroup of airout.airGroups) {
-        for(const air of airgroup.airs) {
-            let settings = {};
-            if(proofManagerConfig.setup && proofManagerConfig.setup.settings) {
-                settings = proofManagerConfig.setup && proofManagerConfig.setup.settings[air.name + "_" + air.airId] || proofManagerConfig.setup.settings.default || {};
-            }
-            if(settings.starkStruct) {
-                minFinalDegree = Math.min(minFinalDegree, settings.starkStruct.steps[settings.starkStruct.steps.length - 1].nBits);
-            } else {
-                minFinalDegree = Math.min(minFinalDegree, log2(air.numRows) + 1);
-            }
-        }
-    }
-
     await Promise.all(airout.airGroups.map(async (airgroup) => {
         setup[airgroup.airgroupId] = [];
 
@@ -73,7 +58,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             if (proofManagerConfig.setup && proofManagerConfig.setup.settings) {
                 settings = proofManagerConfig.setup.settings[`${air.name}`]
                     || proofManagerConfig.setup.settings.default
-                    || { finalDegree: minFinalDegree };
+                    || { };
             }
 
             if (!settings) {
@@ -113,7 +98,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     let globalConstraints;
     
     if(proofManagerConfig.setup && proofManagerConfig.setup.genAggregationSetup) {
-        const airoutInfo = await setAiroutInfo(airout, starkStructs);
+        const airoutInfo = await setAiroutInfo(airout);
         globalConstraints = airoutInfo.globalConstraints;
         globalInfo = airoutInfo.vadcopInfo;
                 
@@ -239,7 +224,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         }
         
     } else {
-        const airoutInfo = await setAiroutInfo(airout, starkStructs);
+        const airoutInfo = await setAiroutInfo(airout);
         globalInfo = airoutInfo.vadcopInfo;
         globalConstraints = airoutInfo.globalConstraints;
     }
