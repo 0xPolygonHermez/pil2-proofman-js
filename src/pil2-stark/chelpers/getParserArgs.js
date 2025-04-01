@@ -64,7 +64,6 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
     let symbolsUsed = codeInfo.symbolsUsed;
 
     const customCommits = !global ? starkInfo.customCommits : [];
-    let nStages = starkInfo.nStages + 2 + customCommits.length;
 
     // Evaluate max and min temporal variable for tmp_ and tmp3_
     let maxid = 1000000;
@@ -79,9 +78,9 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
 
         if(operation.op !== "copy") args.push(operationsTypeMap[operation.op]);
 
-        pushArgs(r.dest, r.dest.type, true, operation.dest_type, verify);
+        pushArgs(r.dest, r.dest.type, true);
         for(let i = 0; i < operation.src.length; i++) {
-            pushArgs(operation.src[i], operation.src[i].type, false, operation[`src${i}_type`], verify);
+            pushArgs(operation.src[i], operation.src[i].type, false);
         }
 
         let opsIndex = operations.findIndex(op => !op.op && op.dest_type === operation.dest_dim && op.src0_type === operation.src0_dim && op.src1_type === operation.src1_dim);
@@ -123,19 +122,33 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
     
     return {expsInfo};
 
-    function pushArgs(r, type, dest, operationType, verify) {
-        if(dest && !["tmp", "cm"].includes(r.type)) throw new Error("Invalid reference type set: " + r.type);
+    function pushArgs(r, type, dest) {
+        if(dest && !["tmp"].includes(r.type)) throw new Error("Invalid reference type set: " + r.type);
         
-        args.push(operationsMapParser[operationType]);        
+        let bufferSize = 1 + starkInfo.nStages + 3 + customCommits.length;        
         switch (type) {
             case "tmp": {
-                if(!global) args.push(0);
                 if (r.dim == 1) {
+                    if (!dest) {
+                        if (!global) {
+                            args.push(bufferSize);
+                        } else {
+                            args.push(0);
+                        }
+                    }
                     args.push(ID1D[r.id]);
                 } else {
                     assert(r.dim == 3);
+                    if (!dest) {
+                        if(!global) {
+                            args.push(bufferSize + 1);
+                        } else {
+                            args.push(4);
+                        }
+                    }
                     args.push(3*ID3D[r.id]);
                 }
+                if (!global && !dest) args.push(0);
                 break;
             }
             case "const": {
@@ -143,13 +156,9 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 const primeIndex = starkInfo.openingPoints.findIndex(p => p === r.prime);
                 if(primeIndex == -1) throw new Error("Something went wrong");
 
-                if(verify) {
-                    args.push(0);
-                } else {
-                    args.push(nStages*primeIndex);
-                }
+                args.push(0);
                 args.push(r.id);
-                
+                args.push(primeIndex);
                 
                 break;
             }
@@ -158,13 +167,9 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 const primeIndex = starkInfo.openingPoints.findIndex(p => p === r.prime);
                 if(primeIndex == -1) throw new Error("Something went wrong");
 
-                if(verify) {
-                    args.push(starkInfo.nStages + 2 + r.commitId);
-                } else {
-                    args.push(nStages*primeIndex + starkInfo.nStages + 2 + r.commitId);
-                }
-                
+                args.push(starkInfo.nStages + 4 + r.commitId);
                 args.push(r.id);
+                args.push(primeIndex);
 
                 break;
             }
@@ -173,13 +178,10 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 const primeIndex = starkInfo.openingPoints.findIndex(p => p === r.prime);
                 if(primeIndex == -1) throw new Error("Something went wrong");
         
-       
-                if(verify) {
-                    args.push(starkInfo.cmPolsMap[r.id].stage);
-                } else {
-                    args.push(nStages*primeIndex + starkInfo.cmPolsMap[r.id].stage);
-                }
+                args.push(starkInfo.cmPolsMap[r.id].stage);
                 args.push(Number(starkInfo.cmPolsMap[r.id].stagePos));
+                args.push(primeIndex);
+
                 break;
             }
             case "number": {
@@ -187,32 +189,83 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 if(num < 0n) num += BigInt(0xFFFFFFFF00000001n);
                 let numString = `${num.toString()}`;
                 if(!numbers.includes(numString)) numbers.push(numString);
-                if(!global) args.push(0);
+                if (!global) {
+                    args.push(bufferSize + 3);
+                } else {
+                    args.push(2);
+                }
                 args.push(numbers.indexOf(numString));
+                if (!global) args.push(0);
                 break;
             }
             case "public": {
-                if(!global) args.push(0);
+                if(!global) {
+                    args.push(bufferSize + 2);
+                } else {
+                    args.push(1);
+                }
                 args.push(r.id);
+                if (!global) args.push(0);
                 break;
             }
-            case "eval":            
+            case "eval": {
+                if(global) throw new Error("evals and airvalues should not appear in a global constraint");
+                args.push(bufferSize + 8);
+                args.push(3*r.id);
+                if (!global) args.push(0);
+                break;
+            }
             case "airvalue": {
                 if(global) throw new Error("evals and airvalues should not appear in a global constraint");
-                args.push(0);
-                args.push(3*r.id);
+                args.push(bufferSize + 4);
+                let airValuePos = 0;
+                for(let i = 0; i < r.id; ++i) {
+                    airValuePos += starkInfo.airValuesMap[i].stage == 1 ? 1 : 3;
+                }
+                args.push(airValuePos);
+                if (!global) args.push(0);
                 break;
             }
-            case "proofvalue":
+            case "proofvalue": {
+                if(!global) {
+                    args.push(bufferSize + 5);
+                } else {
+                    args.push(3);
+                }
+                let proofValuePos = 0;
+                for(let i = 0; i < r.id; ++i) {
+                    if(!global) {
+                        proofValuePos += starkInfo.proofValuesMap[i].stage == 1 ? 1 : 3;
+                    } else {
+                        proofValuePos += globalInfo.proofValuesMap[i].stage == 1 ? 1 : 3;
+                    }
+                }
+                args.push(proofValuePos);
+                if (!global) args.push(0);
+                break;
+            }
             case "challenge": {
-                if(!global) args.push(0);
+                if(!global) {
+                    args.push(bufferSize + 7);
+                } else {
+                    args.push(6);
+                }
                 args.push(3*r.id);
+                if (!global) args.push(0);
                 break;
             }
             case "airgroupvalue": {
-                if(!global) args.push(0);
                 if(!global) {
-                    args.push(3*r.id);
+                    args.push(bufferSize + 6);
+                } else {
+                    args.push(5);
+                }
+                if(!global) {
+                    let airGroupValuePos = 0;
+                    for(let i = 0; i < r.id; ++i) {
+                        airGroupValuePos += starkInfo.airgroupValuesMap[i].stage == 1 ? 1 : 3;
+                    }
+                    args.push(airGroupValuePos);
                 } else {
                     let offset = 0;
                     for(let i = 0; i < r.airgroupId; ++i) {
@@ -220,49 +273,31 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                     }
                     args.push(offset + 3*r.id);
                 }
+                if (!global) args.push(0);
                 break;
             }
             case "xDivXSubXi":
                 if(global) throw new Error("xDivXSub should not appear in a global constraint");
-                if(verify) {
-                    args.push(nStages);
-                    args.push(3*r.id);
-                } else {
-                    args.push(nStages*starkInfo.openingPoints.length);
-                    args.push(3*r.id);
-                }
+                args.push(starkInfo.nStages + 3);
+                args.push(r.id);
+                args.push(0);
                 break;
             case "Zi": {
                 if(global) throw new Error("Zerofier polynomial should not appear in a global constraint");
-                if(verify) {
-                    args.push(nStages);
-                    args.push(3 + 3*r.boundaryId);
-                } else {
-                    args.push(nStages*starkInfo.openingPoints.length);
-                    args.push(1 + r.boundaryId);
-                }
+                args.push(starkInfo.nStages + 2);
+                args.push(1 + r.boundaryId);
+                args.push(0);
                 break;
             }
             case "x": {
                 if(global) throw new Error("X should not appear in a global constraint");
-                if(verify) {
-                    args.push(nStages);
-                    args.push(0);
-                } else {
-                    args.push(nStages*starkInfo.openingPoints.length);
-                    args.push(0);
-                }
+                args.push(starkInfo.nStages + 2);
+                args.push(0);
+                args.push(0);
                 break;
             }
             default: 
                 throw new Error("Unknown type " + type);
-        }
-        if(!dest) {
-            if(["number", "public", "eval", "airvalue", "proofvalue", "challenge", "airgroupvalue"].includes(type)) {
-                args.push(1);
-            } else {
-                args.push(0);
-            }
         }
     }
 
