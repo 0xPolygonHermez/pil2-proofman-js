@@ -44,7 +44,8 @@ function generateStarkStruct(settings, nBits) {
     starkStruct.steps = [{nBits: starkStruct.nBitsExt}];
     let friStepBits = starkStruct.nBitsExt;
     while (friStepBits > finalDegree) {
-        //if (!settings.foldingFactor && friStepBits - 6 == finalDegree) foldingFactor = 3;
+        if (!settings.foldingFactor && friStepBits - 6 == finalDegree) foldingFactor = 3;
+        if (!settings.foldingFactor && friStepBits - 9 == finalDegree) foldingFactor = 3;
         friStepBits = Math.max(friStepBits - foldingFactor, finalDegree);
         starkStruct.steps.push({
             nBits: friStepBits,
