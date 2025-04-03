@@ -139,7 +139,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         setup[airgroup.airgroupId][air.airId].hasCompressor = true;
         globalInfo.airs[airgroup.airgroupId][air.airId].hasCompressor = true;
     
-        const starkStructSettings = { blowupFactor: 2 };
+        const starkStructSettings = { blowupFactor: 2, nQueries: 76 };
         const starkStructCompressor = generateStarkStruct(starkStructSettings, compressorNeeded.nBits);
     
         const recursiveSetup = await genRecursiveSetup(
