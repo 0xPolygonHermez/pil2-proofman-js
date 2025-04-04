@@ -48,21 +48,6 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         await readFixedPolsBin(fixedInfo, setupOptions.binFiles[i], setupOptions.F);
     }
 
-    let minFinalDegree = 5;
-    for(const airgroup of airout.airGroups) {
-        for(const air of airgroup.airs) {
-            let settings = {};
-            if(proofManagerConfig.setup && proofManagerConfig.setup.settings) {
-                settings = proofManagerConfig.setup && proofManagerConfig.setup.settings[air.name + "_" + air.airId] || proofManagerConfig.setup.settings.default || {};
-            }
-            if(settings.starkStruct) {
-                minFinalDegree = Math.min(minFinalDegree, settings.starkStruct.steps[settings.starkStruct.steps.length - 1].nBits);
-            } else {
-                minFinalDegree = Math.min(minFinalDegree, log2(air.numRows) + 1);
-            }
-        }
-    }
-
     await Promise.all(airout.airGroups.map(async (airgroup) => {
         setup[airgroup.airgroupId] = [];
 
@@ -73,7 +58,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             if (proofManagerConfig.setup && proofManagerConfig.setup.settings) {
                 settings = proofManagerConfig.setup.settings[`${air.name}`]
                     || proofManagerConfig.setup.settings.default
-                    || { finalDegree: minFinalDegree };
+                    || { };
             }
 
             if (!settings) {
@@ -113,7 +98,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     let globalConstraints;
     
     if(proofManagerConfig.setup && proofManagerConfig.setup.genAggregationSetup) {
-        const airoutInfo = await setAiroutInfo(airout, starkStructs);
+        const airoutInfo = await setAiroutInfo(airout);
         globalConstraints = airoutInfo.globalConstraints;
         globalInfo = airoutInfo.vadcopInfo;
                 
@@ -154,13 +139,13 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         setup[airgroup.airgroupId][air.airId].hasCompressor = true;
         globalInfo.airs[airgroup.airgroupId][air.airId].hasCompressor = true;
     
-        const starkStructSettings = { blowupFactor: 2 };
+        const starkStructSettings = { blowupFactor: 2, nQueries: 76 };
         const starkStructCompressor = generateStarkStruct(starkStructSettings, compressorNeeded.nBits);
     
         const recursiveSetup = await genRecursiveSetup(
         buildDir, setupOptions, "compressor", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
         setup[airgroup.airgroupId][air.airId].constRoot, [], setup[airgroup.airgroupId][air.airId].starkInfo,
-        setup[airgroup.airgroupId][air.airId].verifierInfo, starkStructCompressor, 21
+        setup[airgroup.airgroupId][air.airId].verifierInfo, starkStructCompressor, 24
         );
     
         ({ constRoot, starkInfo, verifierInfo } = recursiveSetup);
@@ -178,7 +163,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         pil: pilRecursive1
         } = await genRecursiveSetup(
         buildDir, setupOptions, "recursive1", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
-        constRoot, [], starkInfo, verifierInfo, starkStructRecursive, 21,
+        constRoot, [], starkInfo, verifierInfo, starkStructRecursive, 24,
         setup[airgroup.airgroupId][air.airId].hasCompressor
         );
     
@@ -208,7 +193,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         buildDir, setupOptions, "recursive2", airgroup.name, airgroup.airgroupId,
         undefined, globalInfo, [], constRootsRecursives1[airgroup.airgroupId],
         starkInfoRecursives1[airgroup.airgroupId][0], verifierInfoRecursives1[airgroup.airgroupId][0],
-        starkStructRecursive, 21
+        starkStructRecursive, 24
         );
     
         const hashPilRecursive2 = crypto.createHash("sha256")
@@ -228,7 +213,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         const {starkInfoFinal,
             constRootFinal,
             verifierInfoFinal,
-        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 21);
+        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 24);
         
         if(proofManagerConfig.setup.genFinalSnarkSetup) {
             await genFinalSnarkSetup(
@@ -239,7 +224,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         }
         
     } else {
-        const airoutInfo = await setAiroutInfo(airout, starkStructs);
+        const airoutInfo = await setAiroutInfo(airout);
         globalInfo = airoutInfo.vadcopInfo;
         globalConstraints = airoutInfo.globalConstraints;
     }
