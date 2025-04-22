@@ -47,10 +47,9 @@ module.exports.generateFRIPolynomial = function generateFRIPolynomial(res, symbo
         }
     }
 
-    for(let i = 0; i < Object.keys(friExps).length; i++) {
-        const opening = Number(Object.keys(friExps)[i]);
-        const index = res.openingPoints.findIndex(p => p === opening);
-        friExps[opening] = E.mul(friExps[opening], E.xDivXSubXi(opening, index));
+    for(let i = 0; i < res.openingPoints.length; i++) {
+        const opening = res.openingPoints[i];
+        friExps[opening] = E.mul(friExps[opening], E.xDivXSubXi(opening, i));
         if(friExp) {
             friExp = E.add(E.mul(vf1, friExp), friExps[opening]);
         } else {

@@ -6,6 +6,7 @@ module.exports.generateExpressionsCode = function generateExpressionsCode(res, s
     for(let j = 0; j < expressions.length; ++j) {
         const exp = expressions[j];
         if(!exp.keep && !exp.imPol && ![res.cExpId, res.friExpId].includes(j)) continue;
+        if(res.pil2 && res.cExpId === j) continue;
         const dom = (j === res.cExpId || j === res.friExpId) ? "ext" : "n";
         const ctx = {
             stage: exp.stage,
@@ -81,6 +82,16 @@ module.exports.generateConstraintsDebugCode = function generateConstraintsDebugC
             airId: res.airId,
             airgroupId: res.airgroupId,
         };
+
+        for(let i = 0; i < symbols.length; i++) {
+            if(!symbols[i].imPol) continue;
+            const expId = symbols[i].expId;
+            ctx.calculated[expId] = {};
+            for(let i = 0; i < res.openingPoints.length; ++i) {
+                const openingPoint = res.openingPoints[i];
+                ctx.calculated[expId][openingPoint] = { used: true, cm: true };
+            }
+        }
 
         const e = expressions[constraints[j].e];
         for(let k = 0; k < e.symbols.length; k++) {
