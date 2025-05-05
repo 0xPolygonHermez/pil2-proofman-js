@@ -37,8 +37,8 @@ module.exports.addInfoExpressions = function addInfoExpressions(expressions, exp
 
         if(["cm", "const", "custom"].includes(expressions[exp.id].op)) {
             exp = expressions[exp.id];
-            let ev = {type: expressions[exp.id].op, id: expressions[exp.id].id, prime: expressions[exp.id].rowOffset};
-            if(expressions[exp.id].op === "custom") ev.commitId = expressions[exp.id].commitId;
+            let ev = {type: exp.op, id: exp.id, prime: exp.rowOffset};
+            if(expressions[exp.id].op === "custom") ev.commitId = exp.commitId;
             if(evMap && !evMap.find(e => e.type === ev.type && e.id === ev.id && e.prime === ev.prime)) {
                 evMap.push(ev);
             }

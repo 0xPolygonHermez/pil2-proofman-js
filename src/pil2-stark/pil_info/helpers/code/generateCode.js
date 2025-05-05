@@ -26,7 +26,7 @@ module.exports.generateExpressionsCode = function generateExpressionsCode(res, s
                 ctx.calculated[expId] = {};
                 for(let i = 0; i < res.openingPoints.length; ++i) {
                     const openingPoint = res.openingPoints[i];
-                    ctx.calculated[expId][openingPoint] = { used: true };
+                    ctx.calculated[expId][openingPoint] = { used: true, cm: true };
                 }
             }
         }
@@ -38,7 +38,6 @@ module.exports.generateExpressionsCode = function generateExpressionsCode(res, s
 
         pilCodeGen(ctx, symbols, expressions, j, 0);
         const expInfo = buildCode(ctx);
-        
         if(j == res.cExpId) {
             expInfo.code[expInfo.code.length-1].dest = { type: "q", id: 0, dim: res.qDim };
         }
