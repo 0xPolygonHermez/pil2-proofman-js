@@ -170,17 +170,9 @@ function buildCode(ctx) {
     if(ctx.verifierEvaluations) fixDimensionsVerifier(ctx);
 
     let code = { tmpUsed: ctx.tmpUsed, code: ctx.code };
-    if(ctx.symbolsUsed) {
-        code.symbolsUsed = ctx.symbolsUsed.sort((s1, s2) => {
-            const order = { const: 0, cm: 1, tmp: 2 };
-            if (order[s1.op] !== order[s2.op]) return order[s1.op] - order[s2.op];
-            return s1.stage !== s2.stage ? s1.stage - s2.stage : s1.id - s2.id;
-        });
-    }
 
     ctx.code = [];
     ctx.calculated = [];
-    ctx.symbolsUsed = [];
     ctx.tmpUsed = 0;
 
     return code;

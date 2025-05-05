@@ -19,6 +19,7 @@ module.exports.preparePil = function preparePil(F, pil, starkStruct, pil2, optio
     res.proofValuesMap = [];
     res.airgroupValuesMap = [];
     res.airValuesMap = [];
+    res.evMap = [];
     res.pil2 = pil2;
 
     res.mapSectionsN = {
@@ -56,7 +57,7 @@ module.exports.preparePil = function preparePil(F, pil, starkStruct, pil2, optio
     }
 
     for(let i = 0; i < constraints.length; ++i) {
-        addInfoExpressions(expressions, expressions[constraints[i].e]);
+        addInfoExpressions(expressions, expressions[constraints[i].e], res.evMap);
         constraints[i].stage = expressions[constraints[i].e].stage;
     }
 

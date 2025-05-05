@@ -60,7 +60,7 @@ module.exports.addIntermediatePolynomials = function addIntermediatePolynomials(
         addInfoExpressions(expressions, e);
 
         constraints.push({ e: expressions.length - 1, boundary: "everyRow", filename: `${res.name}.ImPol`, stage: expressions[expId].stage });
-        
+        res.evMap.push({ type: "cm", id: res.nCommitments-1, prime: 0});
         expressions[res.cExpId] = E.add(E.mul(vc, expressions[res.cExpId]), e);
     }
 
@@ -76,7 +76,24 @@ module.exports.addIntermediatePolynomials = function addIntermediatePolynomials(
         const index = res.nCommitments++;
         symbols.push({ type: "witness", name: `Q${i}`, polId: index, stage, dim: res.qDim, airId: res.airId, airgroupId: res.airgroupId });
         E.cm(index, 0, stage, res.qDim);
+        res.evMap.push({ type: "cm", id: index, prime: 0 });
     }
+
+    const typeOrder = { "cm": 0, "const": 1 };
+    for(let i = 0; i < res.customCommits.length; ++i) {
+        typeOrder[`custom${i}`] = i + 2;
+    }
+    res.evMap.sort((a, b) => {
+        const a_type = ["const", "cm"].includes(a.type) ? a.type : `custom${a.commitId}`;
+        const b_type = ["const", "cm"].includes(b.type) ? b.type : `custom${b.commitId}`;
+        if(typeOrder[a_type] !== typeOrder[b_type]) {
+            return typeOrder[b_type] - typeOrder[a_type];
+        } else if(a.id !== b.id) {
+            return a.id - b.id;
+        } else {
+            return a.prime - b.prime;
+        }
+    });
     
 }
 

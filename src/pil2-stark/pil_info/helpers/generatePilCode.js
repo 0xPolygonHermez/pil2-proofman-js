@@ -1,7 +1,7 @@
 const {generateFRIPolynomial} = require("./polynomials/friPolinomial");
 
 const { generateConstraintPolynomialVerifierCode, generateConstraintsDebugCode, generateExpressionsCode } = require("./code/generateCode");
-const { addInfoExpressionsSymbols, addInfoExpressions } = require("./helpers");
+const { addInfoExpressions } = require("./helpers");
 const { printExpressions } = require("./pil2/utils");
 
 module.exports.generatePilCode = function generatePilCode(res, symbols, constraints, expressions, hints, debug) {
@@ -10,15 +10,10 @@ module.exports.generatePilCode = function generatePilCode(res, symbols, constrai
 
     const verifierInfo = {};
 
-    for(let i = 0; i < expressions.length; i++) {
-        addInfoExpressionsSymbols(symbols, expressions, expressions[i]);
-    }
-
     if(!debug) {
         generateConstraintPolynomialVerifierCode(res, verifierInfo, symbols, expressions);
         generateFRIPolynomial(res, symbols, expressions);
         addInfoExpressions(expressions, expressions[res.friExpId]);
-        addInfoExpressionsSymbols(symbols, expressions, expressions[res.friExpId]);
     }
 
     expressionsInfo.hintsInfo = module.exports.addHintsInfo(res, expressions, hints);

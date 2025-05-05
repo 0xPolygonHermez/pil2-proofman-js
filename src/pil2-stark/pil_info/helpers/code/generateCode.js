@@ -6,12 +6,11 @@ module.exports.generateExpressionsCode = function generateExpressionsCode(res, s
     for(let j = 0; j < expressions.length; ++j) {
         const exp = expressions[j];
         if(!exp.keep && !exp.imPol && ![res.cExpId, res.friExpId].includes(j)) continue;
-        if(res.pil2 && res.cExpId === j) continue;
+        // if(res.pil2 && res.cExpId === j) continue;
         const dom = (j === res.cExpId || j === res.friExpId) ? "ext" : "n";
         const ctx = {
             stage: exp.stage,
             calculated: {},
-            symbolsUsed: [],
             tmpUsed: 0,
             code: [],
             dom,
@@ -36,16 +35,6 @@ module.exports.generateExpressionsCode = function generateExpressionsCode(res, s
             const symbolDest = symbols.find(s => s.expId === j);
             exprDest = { op: "cm", stage: symbolDest.stage, stageId: symbolDest.stageId, id: symbolDest.polId};
         }
-
-        if(exp.symbols) {
-            for(let k = 0; k < exp.symbols.length; k++) {
-                const symbolUsed = exp.symbols[k];
-                if(!ctx.symbolsUsed.find(s => s.op === symbolUsed.op && s.stage === symbolUsed.stage && s.id === symbolUsed.id)) {
-                    ctx.symbolsUsed.push(symbolUsed);
-                };
-            }
-        }
-         
 
         pilCodeGen(ctx, symbols, expressions, j, 0);
         const expInfo = buildCode(ctx);
@@ -75,7 +64,6 @@ module.exports.generateConstraintsDebugCode = function generateConstraintsDebugC
         const ctx = {
             stage: constraints[j].stage,
             calculated: {},
-            symbolsUsed: [],
             tmpUsed: 0,
             code: [],
             dom: "n",
@@ -92,15 +80,7 @@ module.exports.generateConstraintsDebugCode = function generateConstraintsDebugC
                 ctx.calculated[expId][openingPoint] = { used: true, cm: true };
             }
         }
-
-        const e = expressions[constraints[j].e];
-        for(let k = 0; k < e.symbols.length; k++) {
-            const symbolUsed = e.symbols[k];
-            if(!ctx.symbolsUsed.find(s => s.op === symbolUsed.op && s.stage === symbolUsed.stage && s.id === symbolUsed.id)) {
-                ctx.symbolsUsed.push(symbolUsed);
-            };
-        }
-
+        
         pilCodeGen(ctx, symbols, expressions, constraints[j].e, 0);
         const constraint = buildCode(ctx);
         constraint.boundary = constraints[j].boundary;
@@ -123,12 +103,11 @@ module.exports.generateConstraintPolynomialVerifierCode = function generateConst
         calculated: {},
         tmpUsed: 0,
         code: [],
-        evMap: [],
+        evMap: res.evMap,
         dom: "n",
         airId: res.airId,
         airgroupId: res.airgroupId,
         openingPoints: res.openingPoints,
-        symbolsUsed: [],
         verifierEvaluations: true,
     };
 
@@ -142,50 +121,8 @@ module.exports.generateConstraintPolynomialVerifierCode = function generateConst
         }
     }
 
-    if(expressions[res.cExpId].symbols) {
-        for(let k = 0; k < expressions[res.cExpId].symbols.length; k++) {
-            const symbolUsed = expressions[res.cExpId].symbols[k];
-            if(!ctx.symbolsUsed.find(s => s.op === symbolUsed.op && s.stage === symbolUsed.stage && s.id === symbolUsed.id)) {
-                ctx.symbolsUsed.push(symbolUsed);
-            };
-            if(["cm", "const", "custom"].includes(symbolUsed.op)) {
-                for(let l = 0; l < symbolUsed.rowsOffsets.length; ++l) {
-                    const prime = symbolUsed.rowsOffsets[l];
-                    const openingPos = res.openingPoints.findIndex(p => p === prime);
-                    const rf = { type: symbolUsed.op, id: symbolUsed.id, prime, openingPos };
-                    if(symbolUsed.op === "custom") rf.commitId = symbolUsed.commitId;
-                    ctx.evMap.push(rf);
-                }
-            }
-        }
-    }
-
-    let qIndex = res.cmPolsMap.findIndex(p => p.stage === res.nStages + 1 && p.stageId === 0);
-    let openingPos = res.openingPoints.findIndex(p => p === 0);
-    for (let i = 0; i < res.qDeg; i++) {
-        ctx.evMap.push({ type: "cm", id: qIndex + i, prime: 0, openingPos });
-    }
-
-    const typeOrder = { "cm": 0, "const": 1 };
-    for(let i = 0; i < res.customCommits.length; ++i) {
-        typeOrder[`custom${i}`] = i + 2;
-    }
-    ctx.evMap.sort((a, b) => {
-        const a_type = ["const", "cm"].includes(a.type) ? a.type : `custom${a.commitId}`;
-        const b_type = ["const", "cm"].includes(b.type) ? b.type : `custom${b.commitId}`;
-        if(typeOrder[a_type] !== typeOrder[b_type]) {
-            return typeOrder[b_type] - typeOrder[a_type];
-        } else if(a.id !== b.id) {
-            return a.id - b.id;
-        } else {
-            return a.prime - b.prime;
-        }
-    })
-
     pilCodeGen(ctx, symbols, expressions, res.cExpId, 0);
     verifierInfo.qVerifier = buildCode(ctx, expressions);
     verifierInfo.qVerifier.line = "";
-
-    res.evMap = ctx.evMap;
 }
 

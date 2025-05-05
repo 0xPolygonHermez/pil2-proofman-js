@@ -55,6 +55,10 @@ module.exports = async function pilInfo(F, pil, pil2 = true, starkStruct, option
         addIntermediatePolynomials(res, newExpressions, constraints, symbols, imInfo.imExps, imInfo.qDeg);
     }
     
+    for(let k = 0; k < res.evMap.length; ++k) {
+        res.evMap[k].openingPos = res.openingPoints.findIndex(p => p === res.evMap[k].prime);
+    }
+    
     map(res, symbols, newExpressions, constraints, options);       
 
     const {expressionsInfo, verifierInfo} = generatePilCode(res, symbols, constraints, newExpressions, hints, options.debug);
