@@ -282,6 +282,16 @@ extern "C" __attribute__((visibility("default"))) uint64_t getSizeWitness()  {
   return get_size_of_witness();
 }
 
+extern "C" __attribute__((visibility("default"))) void *initCircuit(char* datFile)  {
+    Circom_Circuit *circuit = loadCircuit(string(datFile));
+    return (void *)circuit;
+}
+
+extern "C" __attribute__((visibility("default"))) void freeCircuit(void* circuit_)  {
+    Circom_Circuit *circuit = (Circom_Circuit *)circuit_;
+    freeCircuit(circuit);
+}
+
 extern "C" __attribute__((visibility("default"))) void getWitnessFinal(void *zkin, char* datFile, void* pWitness, uint64_t nMutexes)  {
     //-------------------------------------------
     // Verifier stark proof
@@ -316,11 +326,11 @@ extern "C" __attribute__((visibility("default"))) void getWitnessFinal(void *zki
     freeCircuit(circuit);
 }
 
-extern "C" __attribute__((visibility("default"))) void getWitness(uint64_t *proof, char* datFile, void* pWitness, uint64_t nMutexes)  {
+extern "C" __attribute__((visibility("default"))) void getWitness(uint64_t *proof, void* circuit_, void* pWitness, uint64_t nMutexes) {
     //-------------------------------------------
     // Verifier stark proof
     //-------------------------------------------
-    Circom_Circuit *circuit = loadCircuit(string(datFile));
+    Circom_Circuit *circuit = (Circom_Circuit *)circuit_;
 
     Circom_CalcWit *ctx = new Circom_CalcWit(circuit, nMutexes);
 
@@ -332,11 +342,8 @@ extern "C" __attribute__((visibility("default"))) void getWitness(uint64_t *proo
     //------------------------------------------- 
     uint64_t *witness = (uint64_t *)pWitness;
     uint64_t sizeWitness = get_size_of_witness();
-    for (uint64_t i = 0; i < sizeWitness; i++)
-    {
+    for (uint64_t i = 0; i < sizeWitness; i++) {
       ctx->getWitness(i, witness[i]);
     }
-    
     delete ctx;
-    freeCircuit(circuit);
 }

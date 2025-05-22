@@ -6,6 +6,7 @@
 #include <functional>
 #include <atomic>
 #include <memory>
+#include <cstring>
 
 #include "circom.hpp"
 //#include "fr.hpp"
