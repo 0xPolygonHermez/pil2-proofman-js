@@ -48,17 +48,17 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         await readFixedPolsBin(fixedInfo, setupOptions.binFiles[i], setupOptions.F);
     }
 
-    await Promise.all(airout.airGroups.map(async (airgroup) => {
+    for (const airgroup of airout.airGroups) {
         setup[airgroup.airgroupId] = [];
 
-        await Promise.all(airgroup.airs.map(async (air) => {
+        for (const air of airgroup.airs) {
             log.info("[Setup Cmd]", `··· Computing setup for air '${air.name}'`);
 
             let settings = {};
             if (proofManagerConfig.setup && proofManagerConfig.setup.settings) {
                 settings = proofManagerConfig.setup.settings[`${air.name}`]
                     || proofManagerConfig.setup.settings.default
-                    || { };
+                    || { blowupFactor: proofManagerConfig.setup.blowupFactor };
             }
 
             if (!settings) {
@@ -89,8 +89,8 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             await writeExpressionsBinFile(path.join(filesDir, `${air.name}.bin`), setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].expressionsInfo);
 
             await writeVerifierExpressionsBinFile(path.join(filesDir, `${air.name}.verifier.bin`), setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].verifierInfo);
-        }));
-    }));
+        }
+    }
 
     setupOptions.optImPols = false;
     

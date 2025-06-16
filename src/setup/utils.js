@@ -20,6 +20,7 @@ function generateStarkStruct(settings, nBits) {
     }
     let verificationHashType = settings.verificationHashType || "GL";
     
+    console.log(settings);
     let hashCommits = settings.hashCommits || true;
     let blowupFactor = settings.blowupFactor || 1;
     let nQueries = Math.ceil(128 / blowupFactor);

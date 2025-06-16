@@ -15,6 +15,7 @@ const argv = require("yargs")
     .alias("p", "publicsinfo")
     .alias("w", "ptau")
     .alias("f", "final")
+    .alias("u", "blowup")
         .argv;
 
 async function run() {
@@ -56,6 +57,7 @@ async function run() {
             genAggregationSetup: argv.recursive || false,
             genFinalSnarkSetup: argv.final || false,
             optImPols: argv.impols || false,
+            blowupFactor: argv.blowup || 1,
             publicsInfo,
             binFiles,
             powersOfTauFile,

@@ -20,19 +20,19 @@ module.exports.addIntermediatePolynomials = function addIntermediatePolynomials(
     const vc = E.challenge("std_vc", stage, dim, 0, vc_id);
     vc.expDeg = 0;
     
-    // const maxDegExpr = module.exports.calculateExpDeg(expressions, expressions[res.cExpId], imExps);
-    // if(maxDegExpr > qDeg + 1) {
-    //     throw new Error(`The maximum degree of the constraint expression has a higher degree (${maxDegExpr}) than the maximum allowed degree (${qDeg + 1})`);
-    // }
+    const maxDegExpr = module.exports.calculateExpDeg(expressions, expressions[res.cExpId], imExps);
+    if(maxDegExpr > qDeg + 1) {
+        throw new Error(`The maximum degree of the constraint expression has a higher degree (${maxDegExpr}) than the maximum allowed degree (${qDeg + 1})`);
+    }
 
-    // for (let i=0; i<imExps.length; i++) {
-    //     const expId = imExps[i];
+    for (let i=0; i<imExps.length; i++) {
+        const expId = imExps[i];
 
-    //     const imPolDeg = module.exports.calculateExpDeg(expressions, expressions[expId], imExps);
-    //     if(imPolDeg > qDeg + 1) {
-    //         throw new Error(`Intermediate polynomial with id: ${expId} has a higher degree (${imPolDeg}) than the maximum allowed degree (${qDeg + 1})`);
-    //     }
-    // }
+        const imPolDeg = module.exports.calculateExpDeg(expressions, expressions[expId], imExps);
+        if(imPolDeg > qDeg + 1) {
+            throw new Error(`Intermediate polynomial with id: ${expId} has a higher degree (${imPolDeg}) than the maximum allowed degree (${qDeg + 1})`);
+        }
+    }
 
     for (let i=0; i<imExps.length; i++) {
         const expId = imExps[i];
