@@ -37,7 +37,7 @@ module.exports = async function pilInfo(F, pil, pil2 = true, starkStruct, option
 
             const calculateImPolsPath = path.resolve(__dirname, './imPolsCalculation/calculateImPols.py');
 
-            const { stdout } = await exec(`python3 ${calculateImPolsPath} ${infoPilFile} ${imPolsFile}`);
+            const { stdout } = await exec(`python ${calculateImPolsPath} ${infoPilFile} ${imPolsFile}`);
             console.log(stdout);
 
             imInfo = JSON.parse(await fs.promises.readFile(imPolsFile, "utf8"));
