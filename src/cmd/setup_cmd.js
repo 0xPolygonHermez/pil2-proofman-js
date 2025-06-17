@@ -32,6 +32,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         pil2: true,
         optImPols: (proofManagerConfig.setup && proofManagerConfig.setup.optImPols) || false,
         constTree: path.resolve(__dirname, '../setup/build/bctree'),
+        skipConstTree: (proofManagerConfig.setup && proofManagerConfig.setup.skipConstTree) || false,
         publicsInfo: proofManagerConfig.setup && proofManagerConfig.setup.publicsInfo,
         powersOfTauFile: proofManagerConfig.setup && proofManagerConfig.setup.powersOfTauFile,
         fflonkSetup: path.resolve(__dirname, '../setup/build/fflonkSetup'),
@@ -83,10 +84,14 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             await fs.promises.writeFile(path.join(filesDir, `${air.name}.verifierinfo.json`), JSON.stringify(setup[airgroup.airgroupId][air.airId].verifierInfo, null, 1), "utf8");
             await fs.promises.writeFile(path.join(filesDir, `${air.name}.expressionsinfo.json`), JSON.stringify(setup[airgroup.airgroupId][air.airId].expressionsInfo, null, 1), "utf8");
 
-            console.log("Computing Constant Tree...");
-            const { stdout } = await exec(`${setupOptions.constTree} -c ${path.join(filesDir, `${air.name}.const`)} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -v ${path.join(filesDir, `${air.name}.verkey.json`)}`);
-            console.log(stdout);
-            setup[airgroup.airgroupId][air.airId].constRoot = JSONbig.parse(await fs.promises.readFile(path.join(filesDir, `${air.name}.verkey.json`), "utf8"));
+            if (!setupOptions.skipConstTree) {
+                console.log("Computing Constant Tree...");
+                const { stdout } = await exec(`${setupOptions.constTree} -c ${path.join(filesDir, `${air.name}.const`)} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -v ${path.join(filesDir, `${air.name}.verkey.json`)}`);
+                console.log(stdout);
+                setup[airgroup.airgroupId][air.airId].constRoot = JSONbig.parse(await fs.promises.readFile(path.join(filesDir, `${air.name}.verkey.json`), "utf8"));
+            } else {
+                console.log("Skipping Constant Tree computation");
+            }
 
             await writeExpressionsBinFile(path.join(filesDir, `${air.name}.bin`), setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].expressionsInfo);
 

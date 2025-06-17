@@ -16,6 +16,7 @@ const argv = require("yargs")
     .alias("w", "ptau")
     .alias("f", "final")
     .alias("u", "blowup")
+    .alias("t", "skipconsttree")
         .argv;
 
 async function run() {
@@ -57,6 +58,7 @@ async function run() {
             genAggregationSetup: argv.recursive || false,
             genFinalSnarkSetup: argv.final || false,
             optImPols: argv.impols || false,
+            skipConstTree: argv.skipconsttree || false,
             blowupFactor: argv.blowup || 1,
             publicsInfo,
             binFiles,
