@@ -76,6 +76,8 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             await getFixedPolsPil2(airgroup.name, air, fixedPols, fixedInfo);
             await fixedPols.saveToFile(path.join(filesDir, `${air.name}.const`));
 
+            setupOptions.filesDir = filesDir;
+            setupOptions.airName = air.name;
             setup[airgroup.airgroupId][air.airId] = await starkSetup(air, starkStruct, setupOptions);
             await fs.promises.writeFile(path.join(filesDir, `${air.name}.starkinfo.json`), JSON.stringify(setup[airgroup.airgroupId][air.airId].starkInfo, null, 1), "utf8");
             await fs.promises.writeFile(path.join(filesDir, `${air.name}.verifierinfo.json`), JSON.stringify(setup[airgroup.airgroupId][air.airId].verifierInfo, null, 1), "utf8");

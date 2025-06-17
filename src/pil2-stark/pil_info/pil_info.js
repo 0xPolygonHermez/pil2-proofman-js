@@ -28,15 +28,12 @@ module.exports = async function pilInfo(F, pil, pil2 = true, starkStruct, option
     if(!options.debug || !options.skipImPols) {
         let imInfo;
 
+        const infoPilJSON = { maxDeg, cExpId: infoPil.res.cExpId, qDim: infoPil.res.qDim, ...infoPil };
+        const infoPilFile = path.join(options.filesDir, `${options.airName}.infopil.json`);
+        await fs.promises.writeFile(infoPilFile, JSON.stringify(infoPilJSON, null, 1), "utf8");
+
         if(options.optImPols) {
-            const infoPilFile = await tmpName();
-            const imPolsFile = await tmpName();
-
-            let maxDeg =  (1 << (starkStruct.nBitsExt - starkStruct.nBits)) + 1;
-
-            const infoPilJSON = { maxDeg, cExpId: infoPil.res.cExpId, qDim: infoPil.res.qDim, ...infoPil };
-
-            await fs.promises.writeFile(infoPilFile, JSON.stringify(infoPilJSON, null, 1), "utf8");
+            const imPolsFile = path.join(options.filesDir, `${options.airName}.impols.json`);
 
             const calculateImPolsPath = path.resolve(__dirname, './imPolsCalculation/calculateImPols.py');
 
@@ -45,8 +42,6 @@ module.exports = async function pilInfo(F, pil, pil2 = true, starkStruct, option
 
             imInfo = JSON.parse(await fs.promises.readFile(imPolsFile, "utf8"));
 
-            fs.promises.unlink(infoPilFile); 
-            fs.promises.unlink(imPolsFile);
         } else {
             imInfo = calculateIntermediatePolynomials(expressions, res.cExpId, maxDeg, res.qDim);
         }
