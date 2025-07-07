@@ -1,3 +1,4 @@
+const fs = require('fs');
 const { createBinFile,
     endWriteSection,
     startWriteSection
@@ -21,16 +22,22 @@ module.exports.writeStringToFile = async function writeStringToFile(fd, str) {
     await fd.write(buff);
 }
 
-module.exports.writeVerifierExpressionsBinFile = async function writeVerifierExpressionsBinFile(cHelpersFilename, starkInfo, verifierInfo) {
+module.exports.writeVerifierExpressionsBinFile = async function writeVerifierExpressionsBinFile(cHelpersFilename, starkInfo, verifierInfo, verkeyRoot, writeRustVerifier = false) {
     console.log("> Writing the chelpers verifier file");
         
-    const binFileInfo = await prepareVerifierExpressionsBin(starkInfo, verifierInfo);
+    const binFileInfo = await prepareVerifierExpressionsBin(starkInfo, verifierInfo, verkeyRoot);
 
     const verInfo = {};
     verInfo.expsInfo = [binFileInfo.qCode, binFileInfo.queryCode];
 
     const cHelpersBin = await createBinFile(cHelpersFilename, "chps", 1, 2, 1 << 22, 1 << 24);
 
+    if (writeRustVerifier) {
+        const rustVerifier = binFileInfo.rustVerifier;
+        const rustVerifierFile = cHelpersFilename.slice(0, -4) + ".rs";
+        await fs.promises.writeFile(rustVerifierFile, rustVerifier, "utf8");    
+    }
+   
     await writeExpressionsSection(cHelpersBin, verInfo.expsInfo, binFileInfo.numbersExps, binFileInfo.maxTmp1, binFileInfo.maxTmp3, binFileInfo.maxArgs, binFileInfo.maxOps, 2, true);
 
     console.log("> Writing the chelpers file finished");
@@ -646,7 +653,7 @@ async function prepareExpressionsBin(starkInfo, expressionsInfo) {
     return res;
 }
 
-async function prepareVerifierExpressionsBin(starkInfo, verifierInfo) {
+async function prepareVerifierExpressionsBin(starkInfo, verifierInfo, verkeyRoot) {
     
     let operations = getAllOperations();
 
@@ -655,20 +662,77 @@ async function prepareVerifierExpressionsBin(starkInfo, verifierInfo) {
     let maxArgs = 0;
     let maxOps = 0;
     let numbersExps = [];
-    let {expsInfo: qCode} = getParserArgs(starkInfo, operations, verifierInfo.qVerifier, numbersExps, false, true, true);
+    let {expsInfo: qCode, verifyRust: verifyQRust} = getParserArgs(starkInfo, operations, verifierInfo.qVerifier, numbersExps, false, true, true);
     qCode.expId = starkInfo.cExpId;
     qCode.line = "";
     if (qCode.nTemp1 > maxTmp1) maxTmp1 = qCode.nTemp1;
     if (qCode.nTemp3 > maxTmp3) maxTmp3 = qCode.nTemp3;
     if (qCode.args.length > maxArgs) maxArgs = qCode.args.length;
     if (qCode.ops.length > maxOps) maxOps = qCode.ops.length;
-    let {expsInfo: queryCode} = getParserArgs(starkInfo, operations, verifierInfo.queryVerifier, numbersExps, false, true);
+    let {expsInfo: queryCode, verifyRust: verifyFRIRust} = getParserArgs(starkInfo, operations, verifierInfo.queryVerifier, numbersExps, false, true);
     queryCode.expId = starkInfo.friExpId;
     queryCode.line = "";
     if (queryCode.nTemp1 > maxTmp1) maxTmp1 = queryCode.nTemp1;
     if (queryCode.nTemp3 > maxTmp3) maxTmp3 = queryCode.nTemp3;
     if (queryCode.args.length > maxArgs) maxArgs = queryCode.args.length;
     if (queryCode.ops.length > maxOps) maxOps = queryCode.ops.length;
-   
-    return {qCode, queryCode, numbersExps, maxTmp1, maxTmp3, maxArgs, maxOps};
+
+    let verifierRust = [];
+    verifierRust.push("use fields::{Goldilocks, CubicExtensionField, Field};");
+    verifierRust.push("use proofman_common::Boundary;");
+    verifierRust.push("use proofman::{VerifierInfo, stark_verify};\n");
+    verifyQRust.unshift("pub fn q_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], publics: &[Goldilocks], zi: &[CubicExtensionField<Goldilocks>], xi_challenge: CubicExtensionField<Goldilocks>) -> CubicExtensionField<Goldilocks> {");
+    verifyQRust.unshift("#[rustfmt::skip]")
+    verifyQRust.push("}");
+    verifierRust.push(...verifyQRust);
+    verifierRust.push("\n");
+    verifyFRIRust.unshift("pub fn query_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], vals: &[Vec<Goldilocks>], xdivxsub: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
+    verifyFRIRust.unshift("#[rustfmt::skip]")
+    verifyFRIRust.push("}\n");
+    verifierRust.push(...verifyFRIRust);
+    let verify = [];
+    verify.push("#[rustfmt::skip]")
+    verify.push("pub fn verify(proof: &[u64]) -> bool {");
+    verify.push("   let verifier_info = VerifierInfo {");
+    verify.push("       root_c: [" + verkeyRoot.map(v => `Goldilocks::new(${v})`).join(", ") + "],");
+    verify.push("        n_publics: " + starkInfo.nPublics + ",");
+    verify.push("        n_stages: " + starkInfo.nStages + ",");
+    verify.push("        n_constants: " + starkInfo.nConstants + ",");
+    verify.push("        n_evals: " + starkInfo.evMap.length + ",");
+    verify.push("        n_bits: " + starkInfo.starkStruct.nBits + ",");
+    verify.push("        n_bits_ext: " + starkInfo.starkStruct.nBitsExt + ",");
+    verify.push("        arity: " + starkInfo.starkStruct.merkleTreeArity + ",");
+    verify.push("        n_fri_queries: " + starkInfo.starkStruct.nQueries + ",");
+    verify.push("        n_fri_steps: " + starkInfo.starkStruct.steps.length + ",");
+    verify.push("        n_challenges: " + starkInfo.challengesMap.length + ",");
+    verify.push("        n_challenges_total: " + (starkInfo.challengesMap.length + starkInfo.starkStruct.steps.length + 1) + ",");
+    verify.push("        fri_steps: vec![" + starkInfo.starkStruct.steps.map(s => s.nBits).join(", ") + "],");
+    verify.push("        hash_commits: " + starkInfo.starkStruct.hashCommits + ",");
+    let num_vals = [];
+    for(let i = 0; i < starkInfo.nStages + 1; ++i) {
+        num_vals.push(starkInfo.mapSectionsN[`cm${i + 1}`]);
+    }
+    verify.push("       num_vals: vec![" + num_vals.join(", ") + "],");
+    verify.push("       opening_points: vec![" + starkInfo.openingPoints.map(p => p.toString()).join(", ") + "],");
+    let boundaries = [];
+    for(let i = 0; i < starkInfo.boundaries.length; ++i) {
+        const b = starkInfo.boundaries[i];
+        const name      = b.name      ?? "None";
+        const offsetMin = b.offsetMin ?? "None";
+        const offsetMax = b.offsetMax ?? "None";
+        boundaries.push(
+            `Boundary { name: "${name}".to_string(), offset_min: ${offsetMin}, offset_max: ${offsetMax} }`
+        );
+    }
+    verify.push("       boundaries: vec![" + boundaries.join(", ") + "],");
+    verify.push("       q_deg: " + starkInfo.qDeg + ",");
+    let qIndex = starkInfo.cmPolsMap.findIndex(p => p.stage === starkInfo.nStages + 1 && p.stageId === 0);
+    let qEvIndex = starkInfo.evMap.findIndex(ev => ev.type === "cm" && ev.id === qIndex);
+    verify.push("       q_index: " + qEvIndex + ",");
+    verify.push("   };");
+    verify.push("   stark_verify(proof, &verifier_info, q_verify, query_verify)")
+    verify.push("}\n");
+    verifierRust.push(...verify);
+    let rustVerifier = verifierRust.join("\n");
+    return {qCode, queryCode, numbersExps, maxTmp1, maxTmp3, maxArgs, maxOps, rustVerifier};
 }
