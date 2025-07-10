@@ -42,7 +42,7 @@
     "protobufjs": "^7.2.4",
     "r1csfile": "^0.0.47",
     "snarkjs": "^0.7.5",
-    "stark-recurser": "https://github.com/0xPolygonHermez/stark-recurser#feature/one-process"
+    "stark-recurser": "https://github.com/0xPolygonHermez/stark-recurser#main"
   },
   "devDependencies": {
     "chai": "^4.3.8",
