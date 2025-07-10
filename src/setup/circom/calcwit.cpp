@@ -23,27 +23,25 @@ u64 fnv1a(std::string s) {
   return hash;
 }
 
-Circom_CalcWit::Circom_CalcWit (Circom_Circuit *aCircuit, uint maxTh) {
-  circuit = aCircuit;
-  inputSignalAssignedCounter = get_main_input_signal_no();
-  inputSignalAssigned = new bool[inputSignalAssignedCounter];
-  for (int i = 0; i< inputSignalAssignedCounter; i++) {
-    inputSignalAssigned[i] = false;
-  }
-  signalValues = new u64[get_total_signal_no()];
-  signalValues[0] = 1;
-  componentMemory = new Circom_Component[get_number_of_components()];
-  // circuitConstants = circuit ->circuitConstants;
-  templateInsId2IOSignalInfo = circuit -> templateInsId2IOSignalInfo;
-  busInsId2FieldInfo = circuit -> busInsId2FieldInfo;
+Circom_CalcWit::Circom_CalcWit(Circom_Circuit *aCircuit, uint maxTh) {
+    circuit = aCircuit;
+    inputSignalAssignedCounter = get_main_input_signal_no();
 
-  maxThread = maxTh;
+    inputSignalAssigned = new bool[inputSignalAssignedCounter];
+    memset(inputSignalAssigned, 0, inputSignalAssignedCounter * sizeof(bool));
 
-  // parallelism
-  numThread = 0;
+    signalValues = new u64[get_total_signal_no()];
+    signalValues[0] = 1;
 
+    componentMemory = new Circom_Component[get_number_of_components()];
+
+    // circuitConstants = circuit ->circuitConstants;
+    templateInsId2IOSignalInfo = circuit->templateInsId2IOSignalInfo;
+    busInsId2FieldInfo = circuit->busInsId2FieldInfo;
+
+    maxThread = maxTh;
+    numThread = 0;
 }
-
 Circom_CalcWit::~Circom_CalcWit() {
   // ...
 }

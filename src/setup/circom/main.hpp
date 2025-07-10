@@ -28,6 +28,7 @@ bool check_valid_number(std::string &s, uint base);
 
 extern "C" __attribute__((visibility("default"))) uint64_t getSizeWitness();
 extern "C" __attribute__((visibility("default"))) void getWitnessFinal(void *zkin, char* datFile, void* pWitness, uint64_t nMutexes = NMUTEXES);
-extern "C" __attribute__((visibility("default"))) void getWitness(uint64_t *proof, char* datFile, void* pWitness, uint64_t nMutexes = NMUTEXES);
-
+extern "C" __attribute__((visibility("default"))) void getWitness(uint64_t *proof, void* circuit_, void* pWitness, uint64_t nMutexes = NMUTEXES);
+extern "C" __attribute__((visibility("default"))) void *initCircuit(char* datFile);
+extern "C" __attribute__((visibility("default"))) void freeCircuit(void* circuit);
 #endif

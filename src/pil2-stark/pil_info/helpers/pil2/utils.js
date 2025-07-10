@@ -304,7 +304,7 @@ module.exports.formatConstraints = function formatConstraints(pilout) {
 
 module.exports.formatSymbols = function formatSymbols(pilout, global = false) {
     const symbols = pilout.symbols
-        .filter(s => !global || ![piloutTypes.AIR_VALUE, piloutTypes.CUSTOM_COL, piloutTypes.FIXED_COL, piloutTypes.WITNESS_COL].includes(s.type))
+        .filter(s => s.type !== 0 && (!global || ![piloutTypes.AIR_VALUE, piloutTypes.CUSTOM_COL, piloutTypes.FIXED_COL, piloutTypes.WITNESS_COL].includes(s.type)))
         .flatMap(s => {
         if(s.type === piloutTypes.CUSTOM_COL && s.stage !== 0) throw new Error("Invalid stage " + s.stage + "for a custom commit");
         if([piloutTypes.FIXED_COL, piloutTypes.WITNESS_COL, piloutTypes.CUSTOM_COL].includes(s.type)) {
