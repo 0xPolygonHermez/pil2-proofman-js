@@ -16,10 +16,14 @@ const argv = require("yargs")
     .alias("g", "airgroups").array("g")
     .alias("i", "airs").array("i")
     .alias("m", "impols")
+    .alias("b", "builddir")
         .argv;
 
 async function run() {
     
+    const buildDir = argv.builddir || "tmp";
+    await fs.promises.mkdir(buildDir, { recursive: true });
+
     const statsFile = argv.output || "tmp/stats.txt";
 
     await fs.promises.mkdir( path.dirname(statsFile), { recursive: true });
@@ -51,6 +55,8 @@ async function run() {
             }
             let starkStruct = generateStarkStruct({}, log2(air.numRows));
             log.info("[Stats  Cmd]", `··· Computing stats for air '${air.name}'`);
+            setupOptions.filesDir = buildDir;
+            setupOptions.airName = air.name;
             const setup = await starkSetup(air, starkStruct, setupOptions);
             statsFileInfo.push(`Airgroup: ${airgroup.name} Air: ${air.name}`);
             statsFileInfo.push(`Summary: ${setup.stats.summary}`);
