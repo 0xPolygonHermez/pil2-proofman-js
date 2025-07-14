@@ -92,10 +92,12 @@ module.exports = async function pilInfo(F, pil, pil2 = true, starkStruct, option
     summary += `| ImPols: ${imPols.length} => ${imPols.reduce((acc, curr) => acc + curr.dim, 0)} = ${imPols.filter(i => i.dim === 1).reduce((acc, curr) => acc + curr.dim, 0)} + ${imPols.filter(i => i.dim === 3).reduce((acc, curr) => acc + curr.dim, 0)} `;
     
     if(res.evMap) summary += `| Total: ${nColumnsBaseField} | nConstraints: ${constraints.length}`;
+    if(res.openingPoints) summary += ` | nOpeningPoints: ${res.openingPoints.length}`;
     if(res.evMap) summary += ` | nEvals: ${res.evMap.length}`;
     
     console.log(`Total Columns: ${nColumns} -> Columns in the basefield: ${nColumnsBaseField}`);
     console.log(`Total Constraints: ${constraints.length}`)
+    if(!options.debug) console.log(`Number of opening points: ${res.openingPoints.length}`)
     if(!options.debug) console.log(`Number of evaluations: ${res.evMap.length}`)
     console.log("------------------------------------------------------------")
     console.log(`SUMMARY | ${pil.name} | ${summary}`);
