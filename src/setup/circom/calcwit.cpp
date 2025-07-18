@@ -34,16 +34,55 @@ Circom_CalcWit::Circom_CalcWit(Circom_Circuit *aCircuit, uint maxTh) {
     signalValues[0] = 1;
 
     componentMemory = new Circom_Component[get_number_of_components()];
+    // Initialize all component pointers to NULL to ensure safe cleanup
+    for (uint i = 0; i < get_number_of_components(); i++) {
+        componentMemory[i].subcomponents = NULL;
+        componentMemory[i].subcomponentsParallel = NULL;
+        componentMemory[i].outputIsSet = NULL;
+        componentMemory[i].mutexes = NULL;
+        componentMemory[i].cvs = NULL;
+        componentMemory[i].sbct = NULL;
+    }
 
     // circuitConstants = circuit ->circuitConstants;
     templateInsId2IOSignalInfo = circuit->templateInsId2IOSignalInfo;
     busInsId2FieldInfo = circuit->busInsId2FieldInfo;
+    listOfTemplateMessages = nullptr; // Initialize to prevent issues
 
     maxThread = maxTh;
     numThread = 0;
 }
 Circom_CalcWit::~Circom_CalcWit() {
-  // ...
+  // Clean up any component memory that wasn't released during execution
+  for (uint i = 0; i < get_number_of_components(); i++) {
+    if (componentMemory[i].subcomponents) {
+      delete[] componentMemory[i].subcomponents;
+    }
+    if (componentMemory[i].subcomponentsParallel) {
+      delete[] componentMemory[i].subcomponentsParallel;
+    }
+    if (componentMemory[i].outputIsSet) {
+      delete[] componentMemory[i].outputIsSet;
+    }
+    if (componentMemory[i].mutexes) {
+      delete[] componentMemory[i].mutexes;
+    }
+    if (componentMemory[i].cvs) {
+      delete[] componentMemory[i].cvs;
+    }
+    if (componentMemory[i].sbct) {
+      delete[] componentMemory[i].sbct;
+    }
+  }
+  
+  // Clean up listOfTemplateMessages if allocated
+  if (listOfTemplateMessages) {
+    delete[] listOfTemplateMessages;
+  }
+  
+  delete[] inputSignalAssigned;
+  delete[] signalValues;
+  delete[] componentMemory;
 }
 
 uint Circom_CalcWit::getInputSignalHashPosition(u64 h) {
