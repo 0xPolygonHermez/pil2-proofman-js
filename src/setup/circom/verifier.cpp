@@ -318,32 +318,32 @@ if (pos != 0){{
 
 if(ctx->componentMemory[pos].subcomponents) {
 delete []ctx->componentMemory[pos].subcomponents;
-ctx->componentMemory[pos].subcomponents = NULL;
+ctx->componentMemory[pos].subcomponents = nullptr;
 }
 
 if(ctx->componentMemory[pos].subcomponentsParallel) {
 delete []ctx->componentMemory[pos].subcomponentsParallel;
-ctx->componentMemory[pos].subcomponentsParallel = NULL;
+ctx->componentMemory[pos].subcomponentsParallel = nullptr;
 }
 
 if(ctx->componentMemory[pos].outputIsSet) {
 delete []ctx->componentMemory[pos].outputIsSet;
-ctx->componentMemory[pos].outputIsSet = NULL;
+ctx->componentMemory[pos].outputIsSet = nullptr;
 }
 
 if(ctx->componentMemory[pos].mutexes) {
 delete []ctx->componentMemory[pos].mutexes;
-ctx->componentMemory[pos].mutexes = NULL;
+ctx->componentMemory[pos].mutexes = nullptr;
 }
 
 if(ctx->componentMemory[pos].cvs) {
 delete []ctx->componentMemory[pos].cvs;
-ctx->componentMemory[pos].cvs = NULL;
+ctx->componentMemory[pos].cvs = nullptr;
 }
 
 if(ctx->componentMemory[pos].sbct) {
 delete []ctx->componentMemory[pos].sbct;
-ctx->componentMemory[pos].sbct = NULL;
+ctx->componentMemory[pos].sbct = nullptr;
 }
 
 }}

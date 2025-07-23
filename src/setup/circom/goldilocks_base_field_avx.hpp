@@ -1,6 +1,8 @@
 #ifndef GOLDILOCKS_AVX
 #define GOLDILOCKS_AVX
+#ifdef __AVX2__
 #include "goldilocks_base_field.hpp"
+
 #include <immintrin.h>
 #include <cassert>
 
@@ -592,4 +594,5 @@ inline void Goldilocks::mmult_avx_8(__m256i &a0, __m256i &a1, __m256i &a2, const
     a2 = b2;
 }
 
+#endif
 #endif
