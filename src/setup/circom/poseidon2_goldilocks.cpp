@@ -3,7 +3,9 @@
 
 #include "poseidon2_goldilocks_constants.hpp"
 #include "goldilocks_base_field.hpp"
-#include <immintrin.h>
+#ifdef __AVX2__
+    #include <immintrin.h>
+#endif
 // #include "circom.hpp"
 
 inline void pow7(Goldilocks::Element &x)
