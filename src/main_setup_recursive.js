@@ -34,8 +34,12 @@ async function run() {
     }
 
     const setupOptions = {
-        constTree: path.resolve(__dirname, 'setup/build/bctree'),
-        binFile: path.resolve(__dirname, 'setup/build/binfile'),
+        constTree: process.platform === 'darwin' 
+                ? path.resolve(__dirname, 'setup/build/bctree_mac')
+                : path.resolve(__dirname, 'setup/build/bctree'),
+        binFile: process.platform === 'darwin' 
+                ? path.resolve(__dirname, 'setup/build/binfile_mac')
+                : path.resolve(__dirname, 'setup/build/binfile'),
         stdPath: argv.stdPath,
     };
 
