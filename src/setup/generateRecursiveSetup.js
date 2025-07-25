@@ -14,6 +14,9 @@ const { runWitnessLibraryGeneration } = require('./generateWitness');
 const F3g = require('../pil2-stark/utils/f3g.js');
 const { writeExpressionsBinFile, writeVerifierExpressionsBinFile } = require("../pil2-stark/chelpers/binFile.js");
 const { starkSetup } = require('../pil2-stark/stark_setup');
+const { AirOut } = require('../airout.js');
+const { writeGlobalConstraintsBinFile } = require('../pil2-stark/chelpers/globalConstraintsBinFile.js');
+const { setAiroutInfo } = require('./utils.js');
 
 module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, setupOptions, template, airgroupName, airgroupId, airId, globalInfo, constRoot, verificationKeys = [], starkInfo, verifierInfo, starkStruct, compressorCols, hasCompressor) {
 
@@ -81,7 +84,7 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
     runWitnessLibraryGeneration(buildDir, filesDir, nameFilename, template);
 
     // Generate setup
-    const {exec: execBuff, pilStr, constPols} = await compressorSetup(F, `${buildDir}/build/${nameFilename}.r1cs`, compressorCols);
+    const {exec: execBuff, pilStr, constPols, pilout} = await compressorSetup(F, `${buildDir}/build/${nameFilename}.r1cs`, compressorCols, true);
 
     await constPols.saveToFile(`${filesDir}/${template}.const`);
 
@@ -91,10 +94,9 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
 
     await fs.promises.writeFile(`${buildDir}/pil/${nameFilename}.pil`, pilStr, "utf8");
 
-    // Build stark info
-    const pilRecursive = await compile(F, `${buildDir}/pil/${nameFilename}.pil`);
-
-    const setup = await starkSetup(pilRecursive, starkStruct, {...setupOptions, F, pil2: false, airgroupId, airId, recursion: true});
+    const airout = new AirOut(pilout, false);
+    let air = airout.airGroups[0].airs[0];
+    const setup = await starkSetup(air, starkStruct, {...setupOptions, F, pil2: true, airgroupId, airId});
 
     await fs.promises.writeFile(`${filesDir}/${template}.starkinfo.json`, JSON.stringify(setup.starkInfo, null, 1), "utf8");
 
@@ -121,4 +123,73 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
 
     return { constRoot: setup.constRoot, starkInfo: setup.starkInfo, verifierInfo: setup.verifierInfo, pil: pilStr }
 
+}
+
+module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buildDir, setupOptions, starkStruct, circomPath, circomName, compressorCols) {
+
+    const F = new F3g();
+
+    const filesDir = path.join(buildDir, "provingKey", "build", "RecursiveC36", "airs", `RecursiveC36`, "air");
+
+    await fs.promises.mkdir(`${buildDir}/circom/`, { recursive: true });
+    await fs.promises.mkdir(`${buildDir}/build/`, { recursive: true });
+    await fs.promises.mkdir(`${buildDir}/pil/`, { recursive: true });
+    await fs.promises.mkdir(filesDir, { recursive: true });
+
+    const circuitsGLPath = path.resolve(__dirname, '../../', 'node_modules/stark-recurser/src/pil2circom/circuits.gl');
+    const starkRecurserCircuits = path.resolve(__dirname, '../../', 'node_modules/stark-recurser/src/vadcop/helpers/circuits');
+
+    // Compile circom
+    console.log("Compiling " + circomName + "...");
+    const circomExecFile = path.resolve(__dirname, 'circom/circom');
+    const compileRecursiveCommand = `${circomExecFile} --O1 --r1cs --prime goldilocks --c --verbose -l ${starkRecurserCircuits} -l ${circuitsGLPath} ${circomPath} -o ${buildDir}/build`;
+    await exec(compileRecursiveCommand);
+
+    console.log("Copying circom files...");
+    fs.copyFile(`${buildDir}/build/${circomName}_cpp/${circomName}.dat`, `${filesDir}/RecursiveC36.dat`, (err) => { if(err) throw err; });
+    
+    // Generate witness library
+    runWitnessLibraryGeneration(buildDir, filesDir, circomName, "RecursiveC36");
+
+    // Generate setup
+    const {exec: execBuff, pilStr, constPols, pilout} = await compressorSetup(F, `${buildDir}/build/${circomName}.r1cs`, compressorCols, true);
+
+    await constPols.saveToFile(`${filesDir}/RecursiveC36.const`);
+
+    const fd =await fs.promises.open(`${filesDir}/RecursiveC36.exec`, "w+");
+    await fd.write(execBuff);
+    await fd.close();
+
+    await fs.promises.writeFile(`${buildDir}/pil/Compressor.pil`, pilStr, "utf8");
+
+    const airout = new AirOut(pilout, false);
+    airout.name = "build";
+    airout.airGroups[0].name = "RecursiveC36";
+    airout.airGroups[0].airs[0].name = "RecursiveC36";
+    let air = airout.airGroups[0].airs[0];
+    const setup = await starkSetup(air, starkStruct, {...setupOptions, F, pil2: true, airgroupId:0, airId:0});
+
+    await fs.promises.writeFile(`${filesDir}/RecursiveC36.starkinfo.json`, JSON.stringify(setup.starkInfo, null, 1), "utf8");
+
+    await fs.promises.writeFile(`${filesDir}/RecursiveC36.verifierinfo.json`, JSON.stringify(setup.verifierInfo, null, 1), "utf8");
+
+    await fs.promises.writeFile(`${filesDir}/RecursiveC36.expressionsinfo.json`, JSON.stringify(setup.expressionsInfo, null, 1), "utf8");
+
+    console.log("Computing Constant Tree...");
+    await exec(`${setupOptions.constTree} -c ${filesDir}/RecursiveC36.const -s ${filesDir}/RecursiveC36.starkinfo.json -v ${filesDir}/RecursiveC36.verkey.json`);
+    setup.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/RecursiveC36.verkey.json`, "utf8"));
+
+    await writeExpressionsBinFile(`${filesDir}/RecursiveC36.bin`, setup.starkInfo, setup.expressionsInfo);
+    await writeVerifierExpressionsBinFile(`${filesDir}/RecursiveC36.verifier.bin`, setup.starkInfo, setup.verifierInfo);
+
+    let globalInfo;
+    let globalConstraints;
+
+    const airoutInfo = await setAiroutInfo(airout);
+    globalInfo = airoutInfo.vadcopInfo;
+    globalConstraints = airoutInfo.globalConstraints;
+
+    await fs.promises.writeFile(`${buildDir}/provingKey/pilout.globalInfo.json`, JSON.stringify(globalInfo, null, 1), "utf8");
+    await fs.promises.writeFile(`${buildDir}/provingKey/pilout.globalConstraints.json`, JSON.stringify(globalConstraints, null, 1), "utf8");
+    await writeGlobalConstraintsBinFile(globalInfo, globalConstraints, `${buildDir}/provingKey/pilout.globalConstraints.bin`);
 }

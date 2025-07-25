@@ -13,6 +13,7 @@ const { runWitnessLibraryGeneration, witnessLibraryGenerationAwait } = require("
 const F3g = require("../pil2-stark/utils/f3g.js");
 const {starkSetup} = require("../pil2-stark/stark_setup");
 const { writeExpressionsBinFile, writeVerifierExpressionsBinFile } = require("../pil2-stark/chelpers/binFile.js");
+const { AirOut } = require('../airout.js');
 
 module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, compressorCols) {
     const F = new F3g();
@@ -69,7 +70,7 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
 
     // Generate setup
     const finalR1csFile = `${buildDir}/build/${nameFilename}.r1cs`;
-    const {exec: execBuff, pilStr, constPols, nBits } = await compressorSetup(F, finalR1csFile, compressorCols);
+    const {exec: execBuff, pilStr, constPols, pilout, nBits } = await compressorSetup(F, finalR1csFile, compressorCols, true);
 
     const fd =await fs.promises.open(`${filesDir}/${nameFilename}.exec`, "w+");
     await fd.write(execBuff);
@@ -78,9 +79,6 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
     const pilFilename = `${buildDir}/pil/${nameFilename}.pil`
     await fs.promises.writeFile(pilFilename, pilStr, "utf8");
 
-    // Compile pil
-    const pilFinal = await compile(F, pilFilename);
-
     if(finalSettings.starkStruct && finalSettings.starkStruct.nBits !== nBits) {
         throw new Error("Final starkStruct nBits does not match with vadcop final circuit size");
     };
@@ -88,7 +86,9 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
     let starkStructFinal = finalSettings.starkStruct || generateStarkStruct(finalSettings, nBits);
     
     // Build stark info
-    const setup = await starkSetup(pilFinal, starkStructFinal, {...setupOptions, F, pil2: false, recursion: true});
+    const airout = new AirOut(pilout, false);
+    let air = airout.airGroups[0].airs[0];
+    const setup = await starkSetup(air, starkStructFinal, {...setupOptions, F, pil2: true, airgroupId: 0, airId: 0});
 
     await constPols.saveToFile(`${filesDir}/${nameFilename}.const`);
 

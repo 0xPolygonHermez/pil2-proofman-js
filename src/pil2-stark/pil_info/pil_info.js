@@ -66,6 +66,8 @@ module.exports = async function pilInfo(F, pil, pil2 = true, starkStruct, option
     let nColumnsBaseField = 0;
     let nColumns = 0;
     summary = `nBits: ${res.starkStruct.nBits} | blowUpFactor: ${res.starkStruct.nBitsExt - res.starkStruct.nBits} | maxConstraintDegree: ${res.qDeg + 1} `;
+    console.log(`Columns fixed: ${res.mapSectionsN.const} -> Columns in the basefield: ${res.mapSectionsN.const}`);
+    summary += `| Fixed: ${res.mapSectionsN.const} `;  
     for(let i = 1; i <= res.nStages + 1; ++i) {
         let stage = i;
         let stageDebug = i === res.nStages + 1 ? "Q" : stage;

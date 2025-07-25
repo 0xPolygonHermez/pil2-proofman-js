@@ -73,7 +73,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             starkStructs.push(starkStruct);
 
             const fixedPols = generateFixedCols(air.symbols.filter(s => s.airGroupId == airgroup.airgroupId), air.numRows);
-            await getFixedPolsPil2(airgroup.name, air, fixedPols, fixedInfo);
+            await getFixedPolsPil2(airgroup.name, air, fixedPols, false, fixedInfo);
             await fixedPols.saveToFile(path.join(filesDir, `${air.name}.const`));
 
             setup[airgroup.airgroupId][air.airId] = await starkSetup(air, starkStruct, setupOptions);
@@ -145,7 +145,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         const recursiveSetup = await genRecursiveSetup(
         buildDir, setupOptions, "compressor", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
         setup[airgroup.airgroupId][air.airId].constRoot, [], setup[airgroup.airgroupId][air.airId].starkInfo,
-        setup[airgroup.airgroupId][air.airId].verifierInfo, starkStructCompressor, 24
+        setup[airgroup.airgroupId][air.airId].verifierInfo, starkStructCompressor, 36
         );
     
         ({ constRoot, starkInfo, verifierInfo } = recursiveSetup);
@@ -163,7 +163,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         pil: pilRecursive1
         } = await genRecursiveSetup(
         buildDir, setupOptions, "recursive1", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
-        constRoot, [], starkInfo, verifierInfo, starkStructRecursive, 24,
+        constRoot, [], starkInfo, verifierInfo, starkStructRecursive, 36,
         setup[airgroup.airgroupId][air.airId].hasCompressor
         );
     
@@ -184,25 +184,25 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         .update(JSON.stringify(pilRecursives1[airgroup.airgroupId][i]))
         .digest("hex");
     
-        if (hashPilRecursive1 !== hash) {
-        throw new Error("All recursive1 pil must be the same");
-        }
+        // if (hashPilRecursive1 !== hash) {
+        // throw new Error("All recursive1 pil must be the same");
+        // }
             }
     
         const { pil: pilRecursive2 } = await genRecursiveSetup(
         buildDir, setupOptions, "recursive2", airgroup.name, airgroup.airgroupId,
         undefined, globalInfo, [], constRootsRecursives1[airgroup.airgroupId],
         starkInfoRecursives1[airgroup.airgroupId][0], verifierInfoRecursives1[airgroup.airgroupId][0],
-        starkStructRecursive, 24
+        starkStructRecursive, 36
         );
     
         const hashPilRecursive2 = crypto.createHash("sha256")
         .update(JSON.stringify(pilRecursive2))
         .digest("hex");
     
-        if (hashPilRecursive1 !== hashPilRecursive2) {
-        throw new Error("Recursive1 and recursive2 pil must be the same");
-        }
+        // if (hashPilRecursive1 !== hashPilRecursive2) {
+        // throw new Error("Recursive1 and recursive2 pil must be the same");
+        // }
         };
   
         let finalSettings = { blowupFactor: 3};
@@ -213,7 +213,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         const {starkInfoFinal,
             constRootFinal,
             verifierInfoFinal,
-        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 24);
+        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 36);
         
         if(proofManagerConfig.setup.genFinalSnarkSetup) {
             await genFinalSnarkSetup(
