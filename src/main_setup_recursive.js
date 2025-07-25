@@ -12,7 +12,7 @@ const argv = require("yargs")
     .alias("b", "builddir")
     .alias("c", "circomPath")
     .alias("n", "circomName")
-    .alias("s", "stdPath")
+    .alias("t", "stdPath")
         .argv;
 
 async function run() {
@@ -33,7 +33,7 @@ async function run() {
     if (!argv.stdPath) {
         throw new Error("Std path and name must be provided");
     }
-    
+
     const setupOptions = {
         F: new F3g("0xFFFFFFFF00000001"),
         pil2: true,
