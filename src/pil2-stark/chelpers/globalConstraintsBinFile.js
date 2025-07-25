@@ -1,6 +1,6 @@
-const GLOBAL_CONSTRAINTS_NSECTIONS = 3;
-const GLOBAL_CONSTRAINTS_SECTION = 2;
-const GLOBAL_HINTS_SECTION = 3;
+const GLOBAL_CONSTRAINTS_NSECTIONS = 2;
+const GLOBAL_CONSTRAINTS_SECTION = 1;
+const GLOBAL_HINTS_SECTION = 2;
 
 const { createBinFile, startWriteSection, endWriteSection } = require("@iden3/binfileutils");
 const { getParserArgs } = require("./getParserArgs.js");

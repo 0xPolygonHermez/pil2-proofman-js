@@ -38,8 +38,6 @@ module.exports.getParserArgsPil1 = function getParserArgsPil1(starkInfo, operati
 
     let code_ = codeInfo.code;
 
-    let symbolsUsed = codeInfo.symbolsUsed;
-
     const customCommits = !global ? starkInfo.customCommits : [];
     let nStages = starkInfo.nStages + 2 + customCommits.length;
 
@@ -74,19 +72,6 @@ module.exports.getParserArgsPil1 = function getParserArgsPil1(starkInfo, operati
         nTemp3: count3d,
         ops,
         args,
-    }
-
-    if(symbolsUsed) {
-        expsInfo.constPolsIds = symbolsUsed.filter(s => s.op === "const").map(s => s.id).sort();
-        expsInfo.cmPolsIds = symbolsUsed.filter(s => s.op === "cm").map(s => s.id).sort();
-        expsInfo.challengeIds = symbolsUsed.filter(s => s.op === "challenge").map(s => s.id).sort();
-        expsInfo.publicsIds = symbolsUsed.filter(s => s.op === "public").map(s => s.id).sort();
-        expsInfo.airgroupValuesIds = symbolsUsed.filter(s => s.op === "airgroupvalue").map(s => s.id).sort();
-        expsInfo.airValuesIds = symbolsUsed.filter(s => s.op === "airvalue").map(s => s.id).sort();
-        expsInfo.customValuesIds = [];
-        for(let i = 0; i < customCommits.length; ++i) {
-            expsInfo.customValuesIds.push(symbolsUsed.filter(s => s.op === "custom" && s.commitId === i).map(s => s.id).sort());
-        }
     }
 
     const destTmp = code_[code_.length - 1].dest;
