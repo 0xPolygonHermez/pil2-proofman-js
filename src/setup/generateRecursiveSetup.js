@@ -83,8 +83,13 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
     // Generate witness library
     runWitnessLibraryGeneration(buildDir, filesDir, nameFilename, template);
 
+    let recurserOptions = { stdPath: setupOptions.stdPath };
+    if (template === "compressor") {
+        recurserOptions.maxConstraintDegree = 5;
+    }
+
     // Generate setup
-    const {exec: execBuff, pilStr, constPols, pilout} = await compressorSetup(F, `${buildDir}/build/${nameFilename}.r1cs`, compressorCols, true, { stdPath: setupOptions.stdPath });
+    const {exec: execBuff, pilStr, constPols, pilout} = await compressorSetup(F, `${buildDir}/build/${nameFilename}.r1cs`, compressorCols, true, recurserOptions);
 
     await constPols.saveToFile(`${filesDir}/${template}.const`);
 
@@ -151,13 +156,9 @@ module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buil
     // Generate witness library
     runWitnessLibraryGeneration(buildDir, filesDir, circomName, "RecursiveC36");
 
-    let recurserOptions = { stdPath: setupOptions.stdPath };
-    if (template === "compressor") {
-        recurserOptions.maxConstraintDegree = 5;
-    }
-    
     // Generate setup
-    const {exec: execBuff, pilStr, constPols, pilout} = await compressorSetup(F, `${buildDir}/build/${circomName}.r1cs`, compressorCols, true, { stdPath: setupOptions.stdPath });
+    let recurserOptions = { stdPath: setupOptions.stdPath };
+    const {exec: execBuff, pilStr, constPols, pilout} = await compressorSetup(F, `${buildDir}/build/${circomName}.r1cs`, compressorCols, true, recurserOptions);
 
     await constPols.saveToFile(`${filesDir}/RecursiveC36.const`);
 
