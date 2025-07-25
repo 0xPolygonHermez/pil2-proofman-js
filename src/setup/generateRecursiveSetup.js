@@ -84,7 +84,7 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
     runWitnessLibraryGeneration(buildDir, filesDir, nameFilename, template);
 
     // Generate setup
-    const {exec: execBuff, pilStr, constPols, pilout} = await compressorSetup(F, `${buildDir}/build/${nameFilename}.r1cs`, compressorCols, true);
+    const {exec: execBuff, pilStr, constPols, pilout} = await compressorSetup(F, `${buildDir}/build/${nameFilename}.r1cs`, compressorCols, true, { stdPath: setupOptions.stdPath });
 
     await constPols.saveToFile(`${filesDir}/${template}.const`);
 
@@ -152,7 +152,7 @@ module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buil
     runWitnessLibraryGeneration(buildDir, filesDir, circomName, "RecursiveC36");
 
     // Generate setup
-    const {exec: execBuff, pilStr, constPols, pilout} = await compressorSetup(F, `${buildDir}/build/${circomName}.r1cs`, compressorCols, true);
+    const {exec: execBuff, pilStr, constPols, pilout} = await compressorSetup(F, `${buildDir}/build/${circomName}.r1cs`, compressorCols, true, { stdPath: setupOptions.stdPath });
 
     await constPols.saveToFile(`${filesDir}/RecursiveC36.const`);
 

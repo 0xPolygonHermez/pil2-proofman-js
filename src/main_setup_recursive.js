@@ -12,6 +12,7 @@ const argv = require("yargs")
     .alias("b", "builddir")
     .alias("c", "circomPath")
     .alias("n", "circomName")
+    .alias("s", "stdPath")
         .argv;
 
 async function run() {
@@ -29,10 +30,15 @@ async function run() {
 
     let starkStructRecursive = generateStarkStruct({ blowupFactor: 3}, 17);
 
+    if (!argv.stdPath) {
+        throw new Error("Std path and name must be provided");
+    }
+    
     const setupOptions = {
         F: new F3g("0xFFFFFFFF00000001"),
         pil2: true,
         constTree: path.resolve(__dirname, 'setup/build/bctree'),
+        stdPath: argv.stdPath,
     };
 
     await genRecursiveSetupTest(buildDir, setupOptions, starkStructRecursive, circomPath, circomName, 36);
