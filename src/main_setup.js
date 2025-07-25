@@ -29,6 +29,10 @@ async function run() {
         throw new Error("Only can generate the final snark if recursive part is activated");
     }
 
+    if (!argv.stdPath) {
+        throw new Error("Std path and name must be provided");
+    }
+    
     if(argv.recursive) {
         if(argv.final) {
             if(!argv.ptau) {
@@ -60,6 +64,7 @@ async function run() {
             publicsInfo,
             binFiles,
             powersOfTauFile,
+            stdPath: argv.stdPath,
         }
     }
 

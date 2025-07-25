@@ -36,6 +36,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         powersOfTauFile: proofManagerConfig.setup && proofManagerConfig.setup.powersOfTauFile,
         fflonkSetup: path.resolve(__dirname, '../setup/build/fflonkSetup'),
         binFiles: proofManagerConfig.setup && proofManagerConfig.setup.binFiles,
+        stdPath: proofManagerConfig.setup && proofManagerConfig.setup.stdPath,
     };
     
     let setup = [];

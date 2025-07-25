@@ -70,7 +70,7 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
 
     // Generate setup
     const finalR1csFile = `${buildDir}/build/${nameFilename}.r1cs`;
-    const {exec: execBuff, pilStr, constPols, pilout, nBits } = await compressorSetup(F, finalR1csFile, compressorCols, true);
+    const {exec: execBuff, pilStr, constPols, pilout, nBits } = await compressorSetup(F, finalR1csFile, compressorCols, true, { stdPath: setupOptions.stdPath });
 
     const fd =await fs.promises.open(`${filesDir}/${nameFilename}.exec`, "w+");
     await fd.write(execBuff);
