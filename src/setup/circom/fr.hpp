@@ -51,13 +51,10 @@ inline uint64_t Fr_str2element(const char *s, uint base) {
   return strtoull(s, NULL, base);
 }
 
-inline char *Fr_element2str(const uint64_t & a) {
+inline std::string Fr_element2str(const uint64_t & a) {
   std::stringstream ss;
   ss << a;
-  std::string str = ss.str();
-  char * cstr = new char [str.length()+1];
-  strcpy (cstr, str.c_str());
-  return cstr;
+  return ss.str();
 }
 
 //inline uint64_t Fr_add_r (const uint64_t & a, const uint64_t & b) {

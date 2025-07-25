@@ -275,6 +275,28 @@ void freeCircuit(Circom_Circuit *circuit)
   delete[] circuit->InputHashMap;
   delete[] circuit->witness2SignalList;
   // delete[] circuit->circuitConstants;
+  
+  // Free templateInsId2IOSignalInfo map entries
+  for (auto& entry : circuit->templateInsId2IOSignalInfo) {
+    IOFieldDefPair& pair = entry.second;
+    for (u32 i = 0; i < pair.len; i++) {
+      delete[] pair.defs[i].lengths;  // Free the lengths array for each IOFieldDef
+    }
+    free(pair.defs);  // Free the defs array
+  }
+  
+  // Free busInsId2FieldInfo array
+  if (circuit->busInsId2FieldInfo != nullptr) {
+    for (int i = 0; i < get_size_of_bus_field_map(); i++) {
+      IOFieldDefPair& pair = circuit->busInsId2FieldInfo[i];
+      for (u32 j = 0; j < pair.len; j++) {
+        delete[] pair.defs[j].lengths;  // Free the lengths array for each IOFieldDef
+      }
+      free(pair.defs);  // Free the defs array
+    }
+    free(circuit->busInsId2FieldInfo);  // Free the main array
+  }
+  
   delete circuit;
 }
 

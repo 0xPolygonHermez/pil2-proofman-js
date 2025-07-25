@@ -316,23 +316,35 @@ void release_memory_component(Circom_CalcWit* ctx, uint pos) {{
 
 if (pos != 0){{
 
-if(ctx->componentMemory[pos].subcomponents)
+if(ctx->componentMemory[pos].subcomponents) {
 delete []ctx->componentMemory[pos].subcomponents;
+ctx->componentMemory[pos].subcomponents = NULL;
+}
 
-if(ctx->componentMemory[pos].subcomponentsParallel)
+if(ctx->componentMemory[pos].subcomponentsParallel) {
 delete []ctx->componentMemory[pos].subcomponentsParallel;
+ctx->componentMemory[pos].subcomponentsParallel = NULL;
+}
 
-if(ctx->componentMemory[pos].outputIsSet)
+if(ctx->componentMemory[pos].outputIsSet) {
 delete []ctx->componentMemory[pos].outputIsSet;
+ctx->componentMemory[pos].outputIsSet = NULL;
+}
 
-if(ctx->componentMemory[pos].mutexes)
+if(ctx->componentMemory[pos].mutexes) {
 delete []ctx->componentMemory[pos].mutexes;
+ctx->componentMemory[pos].mutexes = NULL;
+}
 
-if(ctx->componentMemory[pos].cvs)
+if(ctx->componentMemory[pos].cvs) {
 delete []ctx->componentMemory[pos].cvs;
+ctx->componentMemory[pos].cvs = NULL;
+}
 
-if(ctx->componentMemory[pos].sbct)
+if(ctx->componentMemory[pos].sbct) {
 delete []ctx->componentMemory[pos].sbct;
+ctx->componentMemory[pos].sbct = NULL;
+}
 
 }}
 
