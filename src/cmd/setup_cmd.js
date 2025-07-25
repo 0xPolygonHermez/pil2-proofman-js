@@ -31,7 +31,9 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         F: new F3g("0xFFFFFFFF00000001"),
         pil2: true,
         optImPols: (proofManagerConfig.setup && proofManagerConfig.setup.optImPols) || false,
-        constTree: path.resolve(__dirname, '../setup/build/bctree'),
+        constTree: process.platform === 'darwin' 
+            ? path.resolve(__dirname, '../setup/build/bctree_mac')
+            : path.resolve(__dirname, '../setup/build/bctree'),
         publicsInfo: proofManagerConfig.setup && proofManagerConfig.setup.publicsInfo,
         powersOfTauFile: proofManagerConfig.setup && proofManagerConfig.setup.powersOfTauFile,
         fflonkSetup: path.resolve(__dirname, '../setup/build/fflonkSetup'),

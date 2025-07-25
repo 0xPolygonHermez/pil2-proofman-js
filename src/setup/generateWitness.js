@@ -23,7 +23,8 @@ async function generateWitnessLibrary(buildDir,filesDir, nameFilename, template)
         await exec(`cp ${buildDir}/build/${nameFilename}_cpp/${nameFilename}.cpp ${path.join(tmpDir, "verifier.cpp")}`);
         
         console.log(`Generating witness library for ${nameFilename}...`);
-        await exec(`make -C ${tmpDir} -j witness WITNESS_DIR=${path.resolve(filesDir)} WITNESS_FILE=${template}.so FINAL_VADCOP=true`);
+        const fileExtension = process.platform === 'darwin' ? 'dylib' : 'so';
+        await exec(`make -C ${tmpDir} -j witness WITNESS_DIR=${path.resolve(filesDir)} WITNESS_FILE=${template}.${fileExtension} FINAL_VADCOP=true`);
     } catch (err) {
         console.error("Error during the witness library generation process:", err);
     } finally {
@@ -48,7 +49,8 @@ async function generateWitnessFinalSnarkLibrary(buildDir, filesDir, template, na
             await exec(`cp ${buildDir}/build/${nameFilename}_cpp/${nameFilename}.cpp ${path.join(tmpDir, "verifier.cpp")}`);
             
             console.log(`Generating witness library for ${nameFilename}...`);
-            await exec(`make -C ${tmpDir} -j witness WITNESS_DIR=${path.resolve(filesDir)} WITNESS_FILE=${template}.so`);
+            const fileExtension = process.platform === 'darwin' ? 'dylib' : 'so';
+            await exec(`make -C ${tmpDir} -j witness WITNESS_DIR=${path.resolve(filesDir)} WITNESS_FILE=${template}.${fileExtension}`);
         } catch (err) {
             console.error("Error during the witness library generation process:", err);
         } finally {

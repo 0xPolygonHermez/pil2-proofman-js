@@ -1,11 +1,15 @@
+# Detect the operating system
+UNAME_S := $(shell uname -s)
+
 WITNESS_DIR ?= ./tmp
+ifeq ($(UNAME_S),Darwin)
+WITNESS_FILE ?= libwitness.dylib
+else
 WITNESS_FILE ?= libwitness.so
+endif
 FINAL_VADCOP ?= false
 
 BUILD_DIR := ./build
-
-# Detect the operating system
-UNAME_S := $(shell uname -s)
 
 ifeq ($(FINAL_VADCOP), true)
     OPT_LEVEL := -O1
@@ -21,7 +25,7 @@ ifeq ($(UNAME_S),Darwin)
     SDKPATH  = /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
     CPPFLAGS = -isysroot $(SDKPATH) -I$(HOMEBREW_PREFIX)/include -I$(HOMEBREW_PREFIX)/opt/libomp/include \
         -I$(HOMEBREW_PREFIX)/opt/libsodium/include -I$(HOMEBREW_PREFIX)/opt/gmp/include -MMD -MP $(INC_FLAGS)
-    CXXFLAGS = -std=c++17 -Wall -pthread -Wno-unused-label -Wno-vla-cxx-extension -fPIC \
+    CXXFLAGS = -std=c++17 -Wall -pthread -Wno-unused-label -Wno-vla-cxx-extension -fPIC $(OPT_LEVEL)\
         -Xpreprocessor -fopenmp
     CFLAGS = -rdynamic -L$(HOMEBREW_PREFIX)/lib -L$(HOMEBREW_PREFIX)/opt/libomp/lib \
          -L$(HOMEBREW_PREFIX)/opt/gmp/lib -L$(SDKPATH)/usr/lib -lpthread -lgmpxx -lgmp -lomp

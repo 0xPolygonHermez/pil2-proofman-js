@@ -53,7 +53,8 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
 
     // Compile circom
     console.log("Compiling " + finalFilename + "...");
-    const circomExecFile = path.resolve(__dirname, 'circom/circom');
+    const circomExecutable = process.platform === 'darwin' ? 'circom/circom_mac' : 'circom/circom';
+    const circomExecFile = path.resolve(__dirname, circomExecutable);
     const compileFinalCommand = `${circomExecFile} --O1 --r1cs --prime goldilocks --c --verbose -l ${starkRecurserCircuits} -l ${circuitsGLPath} ${finalFilename} -o ${buildDir}/build`;
     const execCompile = await exec(compileFinalCommand);
     console.log(execCompile.stdout);
