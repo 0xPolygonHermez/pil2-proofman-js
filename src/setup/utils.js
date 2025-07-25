@@ -117,9 +117,8 @@ async function setAiroutInfo(airout, curve = "EcGFp5") {
         constraints: [],
         hints: [],
     };
-    if(airout.constraints !== undefined) {
-        globalConstraints = getGlobalConstraintsInfo(res, airout, true);
-    }
+    
+    globalConstraints = getGlobalConstraintsInfo(res, airout, true);
 
     return { vadcopInfo, globalConstraints };
 }
