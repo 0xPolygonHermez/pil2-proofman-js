@@ -24,7 +24,8 @@ async function generateWitnessLibrary(buildDir,filesDir, nameFilename, template)
         
         console.log(`Generating witness library for ${nameFilename}...`);
         const fileExtension = process.platform === 'darwin' ? 'dylib' : 'so';
-        await exec(`make -C ${tmpDir} -j witness WITNESS_DIR=${path.resolve(filesDir)} WITNESS_FILE=${template}.${fileExtension} FINAL_VADCOP=true`);
+        const execCommand = `make -C ${tmpDir} -j witness WITNESS_DIR=${path.resolve(filesDir)} WITNESS_FILE=${template}.${fileExtension} FINAL_VADCOP=true`;
+        await exec(execCommand);
     } catch (err) {
         console.error("Error during the witness library generation process:", err);
     } finally {
