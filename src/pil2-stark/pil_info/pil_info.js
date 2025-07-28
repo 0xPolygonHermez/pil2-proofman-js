@@ -18,7 +18,7 @@ module.exports = async function pilInfo(F, pil, pil2 = true, starkStruct, option
     
     const expressions = infoPil.expressions;
     const constraints = infoPil.constraints;
-    const hints = infoPil.hints;
+    const hintsInfo = infoPil.hints;
     const symbols = infoPil.symbols;
     const res = infoPil.res;
     
@@ -52,7 +52,7 @@ module.exports = async function pilInfo(F, pil, pil2 = true, starkStruct, option
     
     map(res, symbols, newExpressions, constraints, options);       
 
-    const {expressionsInfo, verifierInfo} = generatePilCode(res, symbols, constraints, newExpressions, hints, options.debug);
+    const {expressionsInfo, verifierInfo} = generatePilCode(res, symbols, constraints, newExpressions, hintsInfo, options.debug);
     
     let nCols = {};
     let summary = "";

@@ -4,7 +4,7 @@ const { generateConstraintPolynomialVerifierCode, generateConstraintsDebugCode, 
 const { addInfoExpressionsSymbols, addInfoExpressions } = require("./helpers");
 const { printExpressions } = require("./pil2/utils");
 
-module.exports.generatePilCode = function generatePilCode(res, symbols, constraints, expressions, hints, debug) {
+module.exports.generatePilCode = function generatePilCode(res, symbols, constraints, expressions, hintsInfo, debug) {
     
     const expressionsInfo = {};
 
@@ -21,7 +21,7 @@ module.exports.generatePilCode = function generatePilCode(res, symbols, constrai
         addInfoExpressionsSymbols(symbols, expressions, expressions[res.friExpId]);
     }
 
-    expressionsInfo.hintsInfo = module.exports.addHintsInfo(res, expressions, hints);
+    expressionsInfo.hintsInfo = hintsInfo;
 
     expressionsInfo.expressionsCode = generateExpressionsCode(res, symbols, expressions);
 
@@ -76,7 +76,7 @@ function processHintFieldValue(values, res, expressions, global, pos = []) {
         } else {
             let processedField;
             if (field.op === "exp") {
-                expressions[field.id].line = printExpressions(res, expressions[field.id], expressions);
+                // expressions[field.id].line = printExpressions(res, expressions[field.id], expressions);
                 processedField = { op: "tmp", id: field.id, dim: expressions[field.id].dim, pos: currentPos };
             } else if (["cm", "custom", "const"].includes(field.op)) {
                 const primeIndex = res.openingPoints.findIndex(p => p === field.rowOffset);

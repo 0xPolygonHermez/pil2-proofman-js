@@ -22,7 +22,22 @@ const argv = require("yargs")
 async function run() {
     
     const buildDir = argv.builddir || "tmp";
-    await fs.promises.mkdir(buildDir, { recursive: true });
+    
+    // Check if buildDir exists as a file and remove it, or create directory
+    try {
+        const stat = await fs.promises.stat(buildDir);
+        if (stat.isFile()) {
+            await fs.promises.unlink(buildDir);
+            await fs.promises.mkdir(buildDir, { recursive: true });
+        }
+    } catch (err) {
+        if (err.code === 'ENOENT') {
+            // Path doesn't exist, create directory
+            await fs.promises.mkdir(buildDir, { recursive: true });
+        } else {
+            throw err;
+        }
+    }
 
     const statsFile = argv.output || "tmp/stats.txt";
 

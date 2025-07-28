@@ -1,5 +1,6 @@
 
 
+const { addHintsInfo } = require("./generatePilCode.js");
 const { addInfoExpressions } = require("./helpers.js");
 const { generatePil1Polynomials } = require("./pil1/generatePil1Polynomials.js");
 const { getPiloutInfo } = require("./pil2/piloutInfo.js");
@@ -72,5 +73,7 @@ module.exports.preparePil = function preparePil(F, pil, starkStruct, pil2, optio
 
     generateConstraintPolynomial(res, expressions, symbols, constraints);
     
-    return {res, expressions, constraints, symbols, hints}
+    const hintsInfo = addHintsInfo(res, expressions, hints);
+
+    return {res, expressions, constraints, symbols, hintsInfo}
 }
