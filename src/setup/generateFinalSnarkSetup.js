@@ -16,7 +16,6 @@ const { runFinalSnarkWitnessLibraryGenerationAwait, witnessLibraryGenerationAwai
 const { AirOut } = require('../airout.js');
 const compilePil2 = require("pil2-compiler/src/compiler.js");
 const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
-const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
 const { writeFixedPolsBin, readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
 
 

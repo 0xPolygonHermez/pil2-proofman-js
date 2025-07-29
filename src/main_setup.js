@@ -16,6 +16,7 @@ const argv = require("yargs")
     .alias("p", "publicsinfo")
     .alias("w", "ptau")
     .alias("f", "final")
+    .alias("u", "fixed")
         .argv;
 
 async function run() {
@@ -28,12 +29,11 @@ async function run() {
     if(argv.final && !argv.recursive) {
         throw new Error("Only can generate the final snark if recursive part is activated");
     }
-
-    if (!argv.stdPath) {
-        throw new Error("Std path and name must be provided");
-    }
-    
+ 
     if(argv.recursive) {
+        if (!argv.stdPath) {
+            throw new Error("Std path and name must be provided");
+        }
         if(argv.final) {
             if(!argv.ptau) {
                 throw new Error("PowersOfTau file must be provided in order to generate final snark");
@@ -65,6 +65,7 @@ async function run() {
             binFiles,
             powersOfTauFile,
             stdPath: argv.stdPath,
+            fixedPath: argv.fixed,
         }
     }
 

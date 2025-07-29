@@ -1,7 +1,8 @@
 
 const pilInfo = require("./pil_info/pil_info.js");
 
-module.exports.starkSetup = async function starkSetup(pil, starkStruct, options) {        
+module.exports.starkSetup = async function starkSetup(pil, starkStruct, options) {
+    console.log("Generating STARK setup...");       
     const {pilInfo: starkInfo, expressionsInfo, verifierInfo, stats} = await pilInfo(pil, starkStruct, options);
 
     const res = {

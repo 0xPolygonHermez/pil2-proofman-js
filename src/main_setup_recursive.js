@@ -30,7 +30,7 @@ async function run() {
     let starkStructRecursive = generateStarkStruct({ blowupFactor: 3}, 17);
 
     if (!argv.stdPath) {
-        throw new Error("Std path and name must be provided");
+        throw new Error("Std path name must be provided");
     }
 
     const setupOptions = {

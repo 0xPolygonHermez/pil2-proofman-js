@@ -34,6 +34,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         fflonkSetup: path.resolve(__dirname, '../setup/build/fflonkSetup'),
         binFiles: proofManagerConfig.setup && proofManagerConfig.setup.binFiles,
         stdPath: proofManagerConfig.setup && proofManagerConfig.setup.stdPath,
+        fixedPath: proofManagerConfig.setup && proofManagerConfig.setup.fixedPath,
     };
     
     let setup = [];
@@ -41,9 +42,10 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     let starkStructs = [];
 
     let fixedInfo = {};
-
-    for(let i = 0; i < setupOptions.binFiles.length; ++i) {
-        await readFixedPolsBin(fixedInfo, setupOptions.binFiles[i]);
+    if (!setupOptions.fixedPath) {
+        for(let i = 0; i < setupOptions.binFiles.length; ++i) {
+            await readFixedPolsBin(fixedInfo, setupOptions.binFiles[i]);
+        }
     }
 
     await Promise.all(airout.airGroups.map(async (airgroup) => {
@@ -70,9 +72,13 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             let starkStruct = settings.starkStruct || generateStarkStruct(settings, log2(air.numRows));
             starkStructs.push(starkStruct);
 
-            const fixedPols = generateFixedCols(air.symbols.filter(s => s.airGroupId == airgroup.airgroupId), air.numRows);
-            await getFixedPolsPil2(airgroup.name, air, fixedPols, fixedInfo);
-            await fixedPols.saveToFile(path.join(filesDir, `${air.name}.const`));
+            if (!setupOptions.fixedPath) {
+                const fixedPols = generateFixedCols(air.symbols.filter(s => s.airGroupId == airgroup.airgroupId), air.numRows);
+                await getFixedPolsPil2(airgroup.name, air, fixedPols, fixedInfo);
+                await fixedPols.saveToFile(path.join(filesDir, `${air.name}.const`));
+            } else {
+                await exec(`cp ${setupOptions.fixedPath}/${air.name}.fixed ${path.join(filesDir, `${air.name}.const`)}`);
+            }
 
             setup[airgroup.airgroupId][air.airId] = await starkSetup(air, starkStruct, setupOptions);
             await fs.promises.writeFile(path.join(filesDir, `${air.name}.starkinfo.json`), JSON.stringify(setup[airgroup.airgroupId][air.airId].starkInfo, null, 1), "utf8");
@@ -84,11 +90,9 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             console.log(stdout);
             setup[airgroup.airgroupId][air.airId].constRoot = JSONbig.parse(await fs.promises.readFile(path.join(filesDir, `${air.name}.verkey.json`), "utf8"));
 
-            // await writeExpressionsBinFile(path.join(filesDir, `${air.name}.bin`), setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].expressionsInfo);
             const { stdout2 } = await exec(`${setupOptions.binFile} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -e ${path.join(filesDir, `${air.name}.expressionsinfo.json`)} -b ${path.join(filesDir, `${air.name}.bin`)}`);
             console.log(stdout2);
 
-            // await writeVerifierExpressionsBinFile(path.join(filesDir, `${air.name}.verifier.bin`), setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].verifierInfo);
             const { stdout3 } = await exec(`${setupOptions.binFile} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -e ${path.join(filesDir, `${air.name}.verifierinfo.json`)} -b ${path.join(filesDir, `${air.name}.verifier.bin`)} --verifier`);
             console.log(stdout3);
         }));
