@@ -35,6 +35,7 @@
   },
   "homepage": "https://github.com/0xPolygonHermez/pil2-proofman-js#readme",
   "dependencies": {
+    "ffjavascript": "^0.3.1",
     "json-bigint": "^1.0.0",
     "npmlog": "^7.0.1",
     "pil2-compiler": "https://github.com/0xPolygonHermez/pil2-compiler.git#fix/const-expr",

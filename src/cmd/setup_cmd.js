@@ -71,7 +71,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             starkStructs.push(starkStruct);
 
             const fixedPols = generateFixedCols(air.symbols.filter(s => s.airGroupId == airgroup.airgroupId), air.numRows);
-            await getFixedPolsPil2(airgroup.name, air, fixedPols, false, fixedInfo);
+            await getFixedPolsPil2(airgroup.name, air, fixedPols, fixedInfo);
             await fixedPols.saveToFile(path.join(filesDir, `${air.name}.const`));
 
             setup[airgroup.airgroupId][air.airId] = await starkSetup(air, starkStruct, setupOptions);

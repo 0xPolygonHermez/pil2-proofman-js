@@ -2,6 +2,7 @@ const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const JSONbig = require('json-bigint')({ useNativeBigInt: true, alwaysParseAsBig: true });
 const fs = require('fs');
+const ffjavascript = require("ffjavascript");
 
 const { compressorSetup } = require('stark-recurser/src/circom2pil/compressor_setup.js');
 const { genCircom } = require('stark-recurser/src/gencircom.js');
@@ -11,6 +12,9 @@ const { runWitnessLibraryGeneration, witnessLibraryGenerationAwait } = require("
 
 const {starkSetup} = require("../pil2-stark/stark_setup");
 const { AirOut } = require('../airout.js');
+const compilePil2 = require("pil2-compiler/src/compiler.js");
+const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
+const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
 
 module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, compressorCols) {
     const starkInfos = [];
@@ -65,14 +69,20 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
 
     // Generate setup
     const finalR1csFile = `${buildDir}/build/${nameFilename}.r1cs`;
-    const {exec: execBuff, pilStr, constPols, pilout, nBits } = await compressorSetup(finalR1csFile, compressorCols, true, { stdPath: setupOptions.stdPath });
+    const {exec: execBuff, pilStr, nBits, fixedPols } = await compressorSetup(finalR1csFile, compressorCols);
+
+    const pilFilename = `${buildDir}/pil/${nameFilename}.pil`;
+    await fs.promises.writeFile(pilFilename, pilStr, "utf8");
+
+    let pilFile = `${buildDir}/build/${nameFilename}.pilout`;
+    let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath] };
+    const F = new ffjavascript.F1Field((1n<<64n)-(1n<<32n)+1n );
+    compilePil2(F, pilFilename, null, pilConfig);
 
     const fd =await fs.promises.open(`${filesDir}/${nameFilename}.exec`, "w+");
     await fd.write(execBuff);
     await fd.close();
 
-    const pilFilename = `${buildDir}/pil/${nameFilename}.pil`
-    await fs.promises.writeFile(pilFilename, pilStr, "utf8");
 
     if(finalSettings.starkStruct && finalSettings.starkStruct.nBits !== nBits) {
         throw new Error("Final starkStruct nBits does not match with vadcop final circuit size");
@@ -81,12 +91,15 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
     let starkStructFinal = finalSettings.starkStruct || generateStarkStruct(finalSettings, nBits);
     
     // Build stark info
-    const airout = new AirOut(pilout, false);
+    const airout = new AirOut(pilFile);
     let air = airout.airGroups[0].airs[0];
+
+    const fixedCols = generateFixedCols(air.symbols.filter(s => s.airGroupId == 0), air.numRows);
+    await getFixedPolsPil2(airout.airGroups[0].name, air, fixedCols, { [`${airout.airGroups[0].name}_${airout.airGroups[0].airs[0].name}`]: fixedPols });
+
+    await fixedCols.saveToFile(`${filesDir}/${nameFilename}.const`);
+
     const setup = await starkSetup(air, starkStructFinal, {...setupOptions, airgroupId: 0, airId: 0});
-
-    await constPols.saveToFile(`${filesDir}/${nameFilename}.const`);
-
 
     await fs.promises.writeFile(`${filesDir}/${nameFilename}.starkinfo.json`, JSON.stringify(setup.starkInfo, null, 1), "utf8");
 

@@ -2,6 +2,7 @@ const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const JSONbig = require('json-bigint')({ useNativeBigInt: true, alwaysParseAsBig: true });
 const fs = require('fs');
+const ffjavascript = require("ffjavascript");
 
 const { compressorSetup } = require('stark-recurser/src/circom2pil/compressor_setup.js');
 const { genCircom } = require('stark-recurser/src/gencircom.js');
@@ -13,6 +14,10 @@ const {starkSetup} = require("../pil2-stark/stark_setup.js");
 const { generateStarkStruct } = require('./utils.js');
 const { runFinalSnarkWitnessLibraryGenerationAwait, witnessLibraryGenerationAwait, runWitnessLibraryGeneration } = require('./generateWitness.js');
 const { AirOut } = require('../airout.js');
+const compilePil2 = require("pil2-compiler/src/compiler.js");
+const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
+const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
+
 
 module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, setupOptions, globalInfo, constRoot, verificationKeys = [], starkInfo, verifierInfo, compressorCols) {
     let template = "recursivef";
@@ -47,21 +52,31 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     await runWitnessLibraryGeneration(buildDir, filesDir, template, template);
  
     // Generate setup
-    const {exec: execBuff, pilStr, constPols, pilout, nBits } = await compressorSetup(`${buildDir}/build/${template}.r1cs`, compressorCols, true, { stdPath: setupOptions.stdPath });
- 
-    await constPols.saveToFile(`${filesDir}/${template}.const`);
+    const {exec: execBuff, pilStr, nBits, fixedPols } = await compressorSetup(`${buildDir}/build/${template}.r1cs`, compressorCols);
+    
+    const pilFilename = `${buildDir}/pil/${template}.pil`;
+    await fs.promises.writeFile(pilFilename, pilStr, "utf8");
+    
+    let pilFile = `${buildDir}/build/${template}.pilout`;
+    let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath] };
+    const F = new ffjavascript.F1Field((1n<<64n)-(1n<<32n)+1n );
+    compilePil2(F, pilFilename, null, pilConfig);
 
     const fd =await fs.promises.open(`${filesDir}/${template}.exec`, "w+");
     await fd.write(execBuff);
     await fd.close();
 
-    await fs.promises.writeFile(`${buildDir}/pil/${template}.pil`, pilStr, "utf8");
-
     const starkStructSettings = { blowupFactor: 4, verificationHashType: "BN128", merkleTreeArity: 4, merkleTreeCustom: false };
     const starkStructRecursiveF = generateStarkStruct(starkStructSettings, nBits);
 
-    const airout = new AirOut(pilout, false);
+    const airout = new AirOut(pilFile);
     let air = airout.airGroups[0].airs[0];
+
+    const fixedCols = generateFixedCols(air.symbols.filter(s => s.airGroupId == 0), air.numRows);
+    await getFixedPolsPil2(airout.airGroups[0].name, air, fixedCols, { [`${airout.airGroups[0].name}_${airout.airGroups[0].airs[0].name}`]: fixedPols });
+
+    await fixedCols.saveToFile(`${filesDir}/${template}.const`);
+    
     const setupRecursiveF = await starkSetup(air, starkStructRecursiveF, {...setupOptions, airgroupId: 0, airId: 0});
 
     await fs.promises.writeFile(`${filesDir}/${template}.starkinfo.json`, JSON.stringify(setupRecursiveF.starkInfo, null, 1), "utf8");

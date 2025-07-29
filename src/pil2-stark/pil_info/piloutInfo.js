@@ -44,7 +44,7 @@ module.exports.getPiloutInfo = function getPiloutInfo(res, pilout) {
     return {expressions, hints, constraints, symbols};
 }
 
-module.exports.getFixedPolsPil2 = function getFixedPolsPil2(airgroupName, pil, cnstPols, skipExternal, cnstPolsBinFilesInfo) {        
+module.exports.getFixedPolsPil2 = function getFixedPolsPil2(airgroupName, pil, cnstPols, cnstPolsBinFilesInfo) {        
     const P = new ProtoOut();
 
     for(let i = 0; i < cnstPols.$$defArray.length; ++i) {
@@ -54,22 +54,20 @@ module.exports.getFixedPolsPil2 = function getFixedPolsPil2(airgroupName, pil, c
         const fixedCols = pil.fixedCols[i];
         const constPol = cnstPols[id];
         if(Object.keys(fixedCols).length === 0) {
-            if (!skipExternal) {
-                const fixedPolsInfo = cnstPolsBinFilesInfo[`${airgroupName}_${pil.name}`];
-                if (!fixedPolsInfo) {
-                    throw new Error(`Fixed polynomials info for airgroup ${airgroupName} and air ${pil.name} not found`);
-                }
-                if(!fixedPolsInfo[def.name]) {
-                    throw new Error(`Fixed polynomial ${def.name} not found`);
-                }
-                let fixed = fixedPolsInfo[def.name].find(e => JSON.stringify(e.lengths) === JSON.stringify(def.lengths));
-                if(!fixed) {
-                    throw new Error(`Fixed polynomial ${def.name} with lenghts ${def.lengths} not found`);
-                }
-                let values = fixed.values;
-                for(let j = 0; j < deg; ++j) {
-                    constPol[j] = BigInt(values[j]);
-                }
+            const fixedPolsInfo = cnstPolsBinFilesInfo[`${airgroupName}_${pil.name}`];
+            if (!fixedPolsInfo) {
+                throw new Error(`Fixed polynomials info for airgroup ${airgroupName} and air ${pil.name} not found`);
+            }
+            if(!fixedPolsInfo[def.name]) {
+                throw new Error(`Fixed polynomial ${def.name} not found`);
+            }
+            let fixed = fixedPolsInfo[def.name].find(e => JSON.stringify(e.lengths) === JSON.stringify(def.lengths));
+            if(!fixed) {
+                throw new Error(`Fixed polynomial ${def.name} with lenghts ${def.lengths} not found`);
+            }
+            let values = fixed.values;
+            for(let j = 0; j < deg; ++j) {
+                constPol[j] = BigInt(values[j]);
             }
         } else {
             for(let j = 0; j < deg; ++j) {
