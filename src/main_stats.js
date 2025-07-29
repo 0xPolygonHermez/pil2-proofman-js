@@ -14,6 +14,7 @@ const argv = require("yargs")
     .alias("a", "airout")
     .alias("o", "output")
     .alias("g", "airgroups").array("g")
+    .alias("s", "starkstructs")
     .alias("i", "airs").array("i")
     .alias("m", "impols")
     .alias("b", "builddir")
@@ -54,6 +55,8 @@ async function run() {
     const airgroups = argv.airgroups || [];
     const airs = argv.airs || [];
 
+    let starkStructsInfo = argv.starkstructs ? JSON.parse(await fs.promises.readFile(argv.starkstructs, "utf8")) : {};
+
     const stats = {};
     let statsFileInfo = [];
     let summary = [];
@@ -68,7 +71,11 @@ async function run() {
                 log.info("[Stats Cmd]", `··· Skipping air '${air.name}'`);
                 continue;
             }
-            let starkStruct = generateStarkStruct({}, log2(air.numRows));
+            let settings = {};
+            if (starkStructsInfo[airgroup.name] && starkStructsInfo[airgroup.name][air.name]) {
+                settings = starkStructsInfo[airgroup.name][air.name];
+            }
+            let starkStruct = generateStarkStruct(settings, log2(air.numRows));
             log.info("[Stats  Cmd]", `··· Computing stats for air '${air.name}'`);
             setupOptions.filesDir = buildDir;
             setupOptions.airName = air.name;
