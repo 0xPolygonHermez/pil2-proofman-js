@@ -10,7 +10,6 @@ const operationsTypeMap = {
 
 const operationsMap = {
     "commit1": 0,
-    "x": 0,
     "Zi": 0,
     "const": 0,
     "custom1": 0,
@@ -29,29 +28,6 @@ const operationsMap = {
     "proofvalue3": 10,
     "challenge": 11, 
     "eval": 12,
-}
-
-const operationsMapParser = {
-    "commit1": 0,
-    "x": 0,
-    "Zi": 0,
-    "const": 0,
-    "custom1": 0,
-    "custom3": 0,
-    "commit3": 0,
-    "xDivXSubXi": 0,
-    "tmp1": 1,
-    "public": 2,
-    "number": 3,
-    "airvalue1": 4,
-    "airvalue3": 4,
-    "proofvalue1": 5,
-    "proofvalue": 5,
-    "proofvalue3": 5,
-    "tmp3": 6,
-    "airgroupvalue": 7,
-    "challenge": 8, 
-    "eval": 9,
 }
 
 module.exports.getParserArgs = function getParserArgs(starkInfo, operations, codeInfo, numbers = [], global = false, verify = false, globalInfo = {}) {
@@ -73,8 +49,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
         const r = code_[j];
         
         let operation = getOperation(r, verify);
-
-        if(operation.op !== "copy") args.push(operationsTypeMap[operation.op]);
+        args.push(operationsTypeMap[operation.op]);
 
         pushArgs(r.dest, r.dest.type, true);
         for(let i = 0; i < operation.src.length; i++) {
@@ -274,13 +249,6 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 args.push(0);
                 break;
             }
-            case "x": {
-                if(global) throw new Error("X should not appear in a global constraint");
-                args.push(starkInfo.nStages + 2);
-                args.push(0);
-                args.push(0);
-                break;
-            }
             default: 
                 throw new Error("Unknown type " + type);
         }
@@ -289,9 +257,9 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
     function getType(r, verify) {
         if(r.type === "cm") {
             return `commit${r.dim}`;
-        } else if(r.type === "const" || (r.type === "custom" && r.dim === 1) || ((r.type === "Zi" || r.type === "x") && !verify)) {
+        } else if(r.type === "const" || (r.type === "custom" && r.dim === 1) || ((r.type === "Zi") && !verify)) {
             return "commit1";
-        } else if(r.type === "xDivXSubXi" || (r.type === "custom" && r.dim === 3) || ((r.type === "Zi" || r.type === "x") && verify)) {
+        } else if(r.type === "xDivXSubXi" || (r.type === "custom" && r.dim === 3) || ((r.type === "Zi") && verify)) {
             return "commit3";
         } else if(r.type === "tmp") {
             return `tmp${r.dim}`;

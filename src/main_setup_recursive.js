@@ -3,7 +3,6 @@ const version = require("../package").version;
 const path = require("path");
 
 const { generateStarkStruct } = require("./setup/utils");
-const F3g = require("./pil2-stark/utils/f3g");
 const { genRecursiveSetupTest } = require("./setup/generateRecursiveSetup");
 
 const argv = require("yargs")
@@ -35,9 +34,8 @@ async function run() {
     }
 
     const setupOptions = {
-        F: new F3g("0xFFFFFFFF00000001"),
-        pil2: true,
         constTree: path.resolve(__dirname, 'setup/build/bctree'),
+        binFile: path.resolve(__dirname, 'setup/build/binfile'),
         stdPath: argv.stdPath,
     };
 

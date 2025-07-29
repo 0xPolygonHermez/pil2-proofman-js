@@ -3,15 +3,12 @@ const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const JSONbig = require('json-bigint')({ useNativeBigInt: true, alwaysParseAsBig: true });
 const fs = require('fs');
-const { compile } = require('pilcom');
 const pil2circom = require('stark-recurser/src/pil2circom/pil2circom.js');
 const {compressorSetup} = require('stark-recurser/src/circom2pil/compressor_setup');
 const {genCircom} = require('stark-recurser/src/gencircom.js');
-const { genNullProof } = require('stark-recurser/src/pil2circom/proof2zkin');
 
 const path = require('path');
 const { runWitnessLibraryGeneration } = require('./generateWitness');
-const F3g = require('../pil2-stark/utils/f3g.js');
 const { writeExpressionsBinFile, writeVerifierExpressionsBinFile } = require("../pil2-stark/chelpers/binFile.js");
 const { starkSetup } = require('../pil2-stark/stark_setup');
 const { AirOut } = require('../airout.js');
@@ -19,8 +16,6 @@ const { writeGlobalConstraintsBinFile } = require('../pil2-stark/chelpers/global
 const { setAiroutInfo } = require('./utils.js');
 
 module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, setupOptions, template, airgroupName, airgroupId, airId, globalInfo, constRoot, verificationKeys = [], starkInfo, verifierInfo, starkStruct, compressorCols, hasCompressor) {
-
-    const F = new F3g();
 
     let inputChallenges = false;
     let verkeyInput = false;
@@ -89,7 +84,7 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
     }
 
     // Generate setup
-    const {exec: execBuff, pilStr, constPols, pilout} = await compressorSetup(F, `${buildDir}/build/${nameFilename}.r1cs`, compressorCols, true, recurserOptions);
+    const {exec: execBuff, pilStr, constPols, pilout} = await compressorSetup(`${buildDir}/build/${nameFilename}.r1cs`, compressorCols, true, recurserOptions);
 
     await constPols.saveToFile(`${filesDir}/${template}.const`);
 
@@ -101,7 +96,7 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
 
     const airout = new AirOut(pilout, false);
     let air = airout.airGroups[0].airs[0];
-    const setup = await starkSetup(air, starkStruct, {...setupOptions, F, pil2: true, airgroupId, airId});
+    const setup = await starkSetup(air, starkStruct, {...setupOptions, airgroupId, airId});
 
     await fs.promises.writeFile(`${filesDir}/${template}.starkinfo.json`, JSON.stringify(setup.starkInfo, null, 1), "utf8");
 
@@ -110,12 +105,16 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
     await fs.promises.writeFile(`${filesDir}/${template}.expressionsinfo.json`, JSON.stringify(setup.expressionsInfo, null, 1), "utf8");
 
     console.log("Computing Constant Tree...");
-    // await exec(`${setupOptions.constTree} -c ${filesDir}/${template}.const -s ${filesDir}/${template}.starkinfo.json -t ${filesDir}/${template}.consttree -v ${filesDir}/${template}.verkey.json`);
     await exec(`${setupOptions.constTree} -c ${filesDir}/${template}.const -s ${filesDir}/${template}.starkinfo.json -v ${filesDir}/${template}.verkey.json`);
     setup.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/${template}.verkey.json`, "utf8"));
    
-    await writeExpressionsBinFile(`${filesDir}/${template}.bin`, setup.starkInfo, setup.expressionsInfo);
-    await writeVerifierExpressionsBinFile(`${filesDir}/${template}.verifier.bin`, setup.starkInfo, setup.verifierInfo);
+    // await writeExpressionsBinFile(`${filesDir}/${template}.bin`, setup.starkInfo, setup.expressionsInfo);
+    const { stdout2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.expressionsinfo.json -b ${filesDir}/${template}.bin`);
+    console.log(stdout2);
+
+    // await writeVerifierExpressionsBinFile(`${filesDir}/${template}.verifier.bin`, setup.starkInfo, setup.verifierInfo);
+    const { stdout3 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.verifierinfo.json -b ${filesDir}/${template}.verifier.bin --verifier`);
+    console.log(stdout3);
     
 
     if(template === "recursive2") {
@@ -131,8 +130,6 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
 }
 
 module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buildDir, setupOptions, starkStruct, circomPath, circomName, compressorCols) {
-
-    const F = new F3g();
 
     const filesDir = path.join(buildDir, "provingKey", "build", "RecursiveC36", "airs", `RecursiveC36`, "air");
 
@@ -173,7 +170,7 @@ module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buil
     airout.airGroups[0].name = "RecursiveC36";
     airout.airGroups[0].airs[0].name = "RecursiveC36";
     let air = airout.airGroups[0].airs[0];
-    const setup = await starkSetup(air, starkStruct, {...setupOptions, F, pil2: true, airgroupId:0, airId:0});
+    const setup = await starkSetup(air, starkStruct, {...setupOptions, F, airgroupId:0, airId:0});
 
     await fs.promises.writeFile(`${filesDir}/RecursiveC36.starkinfo.json`, JSON.stringify(setup.starkInfo, null, 1), "utf8");
 

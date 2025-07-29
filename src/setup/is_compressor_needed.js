@@ -3,7 +3,6 @@ const fs = require("fs");
 const path = require('path');
 const pil2circom = require("stark-recurser/src/pil2circom/pil2circom.js");
 const { getCompressorConstraints } = require("stark-recurser/src/circom2pil/compressor_constraints.js");
-const F3g = require("stark-recurser/src/utils/f3g.js");
 
 const util = require('util');
 const { exec } = require('child_process');
@@ -41,10 +40,9 @@ module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot,
     console.log(compileRecursiveCommand);
     await execPromise(compileRecursiveCommand, { cwd: tempDir });
     
-    const F = new F3g();
     const r1cs = await readR1cs(tmpR1csFilename);
 
-    const {NUsed} = getCompressorConstraints(F, r1cs, 36);
+    const {NUsed} = getCompressorConstraints(r1cs, 36);
     
     console.log("Number of rows used", NUsed);
 

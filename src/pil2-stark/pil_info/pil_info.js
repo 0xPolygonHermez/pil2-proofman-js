@@ -13,8 +13,8 @@ const childProcess = require('child_process'); // Split into two lines for clari
 const exec = util.promisify(childProcess.exec);
 const {tmpName} = require("tmp-promise");
 
-module.exports = async function pilInfo(F, pil, pil2 = true, starkStruct, options = {}) {
-    const infoPil = preparePil(F, pil, starkStruct, pil2, options);
+module.exports = async function pilInfo(pil, starkStruct, options = {}) {
+    const infoPil = preparePil(pil, starkStruct, options);
     
     const expressions = infoPil.expressions;
     const constraints = infoPil.constraints;

@@ -1,6 +1,6 @@
 const fs =require("fs");
 const { getGlobalConstraintsInfo } = require("../pil2-stark/pil_info/getGlobalConstraintsInfo");
-const { formatSymbols } = require("../pil2-stark/pil_info/helpers/pil2/utils");
+const { formatSymbols } = require("../pil2-stark/pil_info/utils");
 const { mapSymbols } = require("../pil2-stark/pil_info/map");
 
 async function fileExists(path) {

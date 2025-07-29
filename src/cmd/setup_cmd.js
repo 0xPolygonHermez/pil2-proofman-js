@@ -8,11 +8,8 @@ const JSONbig = require('json-bigint')({ useNativeBigInt: true, alwaysParseAsBig
 const log = require("../../logger.js");
 const { AirOut } = require("../airout.js");
 
-const F3g = require('../pil2-stark/utils/f3g.js');
-const { writeExpressionsBinFile, writeVerifierExpressionsBinFile } = require("../pil2-stark/chelpers/binFile.js");
 const { writeGlobalConstraintsBinFile } = require("../pil2-stark/chelpers/globalConstraintsBinFile.js");
 const { starkSetup } = require('../pil2-stark/stark_setup.js');
-const { getFixedPolsPil2 } = require("../pil2-stark/pil_info/helpers/pil2/piloutInfo.js");
 const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
 
 const { genFinalSetup } = require("../setup/generateFinalSetup.js");
@@ -21,6 +18,7 @@ const { isCompressorNeeded } = require('../setup/is_compressor_needed.js');
 const { generateStarkStruct, setAiroutInfo, log2 } = require("../setup/utils.js");
 const { genFinalSnarkSetup } = require('../setup/generateFinalSnarkSetup.js');
 const { readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
+const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
 
 
 // NOTE: by the moment this is a STARK setup process, it should be a generic setup process?
@@ -28,10 +26,9 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     const airout = new AirOut(proofManagerConfig.airout.airoutFilename);
 
     const setupOptions = {
-        F: new F3g("0xFFFFFFFF00000001"),
-        pil2: true,
         optImPols: (proofManagerConfig.setup && proofManagerConfig.setup.optImPols) || false,
         constTree: path.resolve(__dirname, '../setup/build/bctree'),
+        binFile: path.resolve(__dirname, '../setup/build/binfile'),
         publicsInfo: proofManagerConfig.setup && proofManagerConfig.setup.publicsInfo,
         powersOfTauFile: proofManagerConfig.setup && proofManagerConfig.setup.powersOfTauFile,
         fflonkSetup: path.resolve(__dirname, '../setup/build/fflonkSetup'),
@@ -46,7 +43,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     let fixedInfo = {};
 
     for(let i = 0; i < setupOptions.binFiles.length; ++i) {
-        await readFixedPolsBin(fixedInfo, setupOptions.binFiles[i], setupOptions.F);
+        await readFixedPolsBin(fixedInfo, setupOptions.binFiles[i]);
     }
 
     await Promise.all(airout.airGroups.map(async (airgroup) => {
@@ -87,9 +84,13 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             console.log(stdout);
             setup[airgroup.airgroupId][air.airId].constRoot = JSONbig.parse(await fs.promises.readFile(path.join(filesDir, `${air.name}.verkey.json`), "utf8"));
 
-            await writeExpressionsBinFile(path.join(filesDir, `${air.name}.bin`), setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].expressionsInfo);
+            // await writeExpressionsBinFile(path.join(filesDir, `${air.name}.bin`), setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].expressionsInfo);
+            const { stdout2 } = await exec(`${setupOptions.binFile} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -e ${path.join(filesDir, `${air.name}.expressionsinfo.json`)} -b ${path.join(filesDir, `${air.name}.bin`)}`);
+            console.log(stdout2);
 
-            await writeVerifierExpressionsBinFile(path.join(filesDir, `${air.name}.verifier.bin`), setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].verifierInfo);
+            // await writeVerifierExpressionsBinFile(path.join(filesDir, `${air.name}.verifier.bin`), setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].verifierInfo);
+            const { stdout3 } = await exec(`${setupOptions.binFile} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -e ${path.join(filesDir, `${air.name}.verifierinfo.json`)} -b ${path.join(filesDir, `${air.name}.verifier.bin`)} --verifier`);
+            console.log(stdout3);
         }));
     }));
 
