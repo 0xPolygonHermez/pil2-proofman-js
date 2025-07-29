@@ -83,9 +83,10 @@ module.exports = async function pilInfo(F, pil, pil2 = true, starkStruct, option
         nColumnsBaseField += nColsBaseField;
     }
 
+    summary += `| Manual intermediates: ${res.cmPolsMap.filter(p => !p.imPol && p.stage === 2).length - 1} `;
     const imPols = res.cmPolsMap.filter(p => p.imPol);
     summary += `| ImPols: ${imPols.length} => ${imPols.reduce((acc, curr) => acc + curr.dim, 0)} = ${imPols.filter(i => i.dim === 1).reduce((acc, curr) => acc + curr.dim, 0)} + ${imPols.filter(i => i.dim === 3).reduce((acc, curr) => acc + curr.dim, 0)} `;
-    
+
     if(res.evMap) summary += `| Total: ${nColumnsBaseField} | nConstraints: ${constraints.length}`;
     if(res.evMap) summary += ` | nEvals: ${res.evMap.length}`;
     
