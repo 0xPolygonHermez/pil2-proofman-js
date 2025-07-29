@@ -15,6 +15,7 @@ const { AirOut } = require('../airout.js');
 const compilePil2 = require("pil2-compiler/src/compiler.js");
 const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
 const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
+const { writeFixedPolsBin, readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
 
 module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, compressorCols) {
     const starkInfos = [];
@@ -69,7 +70,9 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
 
     // Generate setup
     const finalR1csFile = `${buildDir}/build/${nameFilename}.r1cs`;
-    const {exec: execBuff, pilStr, nBits, fixedPols } = await compressorSetup(finalR1csFile, compressorCols);
+    const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await compressorSetup(finalR1csFile, compressorCols);
+
+    await writeFixedPolsBin(`${buildDir}/build/${nameFilename}.fixed.bin`, airgroupName, airName, 1 << nBits, fixedPols);
 
     const pilFilename = `${buildDir}/pil/${nameFilename}.pil`;
     await fs.promises.writeFile(pilFilename, pilStr, "utf8");
@@ -94,8 +97,10 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
     const airout = new AirOut(pilFile);
     let air = airout.airGroups[0].airs[0];
 
+    let fixedInfo = {};
+    await readFixedPolsBin(fixedInfo, `${buildDir}/build/${nameFilename}.fixed.bin`);
     const fixedCols = generateFixedCols(air.symbols.filter(s => s.airGroupId == 0), air.numRows);
-    await getFixedPolsPil2(airout.airGroups[0].name, air, fixedCols, { [`${airout.airGroups[0].name}_${airout.airGroups[0].airs[0].name}`]: fixedPols });
+    await getFixedPolsPil2(airout.airGroups[0].name, air, fixedCols, fixedInfo);
 
     await fixedCols.saveToFile(`${filesDir}/${nameFilename}.const`);
 

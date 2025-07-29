@@ -18,8 +18,9 @@ const { setAiroutInfo } = require('./utils.js');
 const compilePil2 = require("pil2-compiler/src/compiler.js");
 const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
 const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
+const { writeFixedPolsBin, readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
 
-module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, setupOptions, template, airgroupName, airgroupId, airId, globalInfo, constRoot, verificationKeys = [], starkInfo, verifierInfo, starkStruct, compressorCols, hasCompressor) {
+module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, setupOptions, template, airGroupName, airgroupId, airId, globalInfo, constRoot, verificationKeys = [], starkInfo, verifierInfo, starkStruct, compressorCols, hasCompressor) {
 
     let inputChallenges = false;
     let verkeyInput = false;
@@ -35,18 +36,18 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
         verifierName = `${airName}.verifier.circom`;
         nameFilename = `${airName}_${template}`;    
         templateFilename = path.resolve(__dirname,"../../", `node_modules/stark-recurser/src/vadcop/templates/${template}.circom.ejs`);
-        filesDir = `${buildDir}/provingKey/${globalInfo.name}/${airgroupName}/airs/${airName}/${template}`;
+        filesDir = `${buildDir}/provingKey/${globalInfo.name}/${airGroupName}/airs/${airName}/${template}`;
     } else if(template === "recursive1") {
         let airName = globalInfo.airs[airgroupId][airId].name;
         verifierName = `${airName}_compressor.verifier.circom`;
         nameFilename = `${airName}_${template}`;
         templateFilename = path.resolve(__dirname,"../../", `node_modules/stark-recurser/src/vadcop/templates/recursive1.circom.ejs`);
-        filesDir = `${buildDir}/provingKey/${globalInfo.name}/${airgroupName}/airs/${airName}/recursive1/`;
+        filesDir = `${buildDir}/provingKey/${globalInfo.name}/${airGroupName}/airs/${airName}/recursive1/`;
     } else if (template === "recursive2") {
-        verifierName = `${airgroupName}_recursive2.verifier.circom`;
-        nameFilename = `${airgroupName}_${template}`;
+        verifierName = `${airGroupName}_recursive2.verifier.circom`;
+        nameFilename = `${airGroupName}_${template}`;
         templateFilename =  path.resolve(__dirname,"../../", `node_modules/stark-recurser/src/vadcop/templates/recursive2.circom.ejs`);
-        filesDir = `${buildDir}/provingKey/${globalInfo.name}/${airgroupName}/${template}`;
+        filesDir = `${buildDir}/provingKey/${globalInfo.name}/${airGroupName}/${template}`;
         enableInput = (globalInfo.air_groups.length > 1 || globalInfo.airs[0].length > 1)  ? true : false;
         verkeyInput = true;
     } else {
@@ -88,7 +89,9 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
     }
 
     // Generate setup
-    const {exec: execBuff, pilStr, fixedPols} = await compressorSetup(`${buildDir}/build/${nameFilename}.r1cs`, compressorCols, recurserOptions);
+    const {exec: execBuff, pilStr, fixedPols, airgroupName, airName, nBits } = await compressorSetup(`${buildDir}/build/${nameFilename}.r1cs`, compressorCols, recurserOptions);
+
+    await writeFixedPolsBin(`${buildDir}/build/${nameFilename}.fixed.bin`, airgroupName, airName, 1 << nBits, fixedPols);
 
     await fs.promises.writeFile(`${buildDir}/pil/${nameFilename}.pil`, pilStr, "utf8");
 
@@ -105,8 +108,10 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
     const airout = new AirOut(pilFile);
     let air = airout.airGroups[0].airs[0];
 
+    let fixedInfo = {};
+    await readFixedPolsBin(fixedInfo, `${buildDir}/build/${nameFilename}.fixed.bin`);
     const fixedCols = generateFixedCols(air.symbols.filter(s => s.airGroupId == 0), air.numRows);
-    await getFixedPolsPil2(airout.airGroups[0].name, air, fixedCols, { [`${airout.airGroups[0].name}_${airout.airGroups[0].airs[0].name}`]: fixedPols });
+    await getFixedPolsPil2(airout.airGroups[0].name, air, fixedCols, fixedInfo);
 
     await fixedCols.saveToFile(`${filesDir}/${template}.const`);
 
@@ -169,10 +174,12 @@ module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buil
 
     // Generate setup
     let recurserOptions = { };
-    const {exec: execBuff, pilStr, fixedPols } = await compressorSetup(`${buildDir}/build/${circomName}.r1cs`, compressorCols, recurserOptions);
+    const {exec: execBuff, pilStr, fixedPols, airgroupName, airName, nBits } = await compressorSetup(`${buildDir}/build/${circomName}.r1cs`, compressorCols, recurserOptions);
+
+    await writeFixedPolsBin(`${buildDir}/build/RecursiveC36.bin`, airgroupName, airName, 1 << nBits, fixedPols);
 
     await fs.promises.writeFile(`${buildDir}/pil/RecursiveC36.pil`, pilStr, "utf8");
-
+    
     let pilFile = `${buildDir}/build/RecursiveC36.pilout`;
     let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath] };
     const F = new ffjavascript.F1Field((1n<<64n)-(1n<<32n)+1n );
@@ -185,8 +192,11 @@ module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buil
 
     const airout = new AirOut(pilFile);
     let air = airout.airGroups[0].airs[0];
+
+    let fixedInfo = {};
+    await readFixedPolsBin(fixedInfo, `${buildDir}/build/RecursiveC36.bin`);
     const fixedCols = generateFixedCols(air.symbols.filter(s => s.airGroupId == 0), air.numRows);
-    await getFixedPolsPil2(airout.airGroups[0].name, air, fixedCols, { [`${airout.airGroups[0].name}_${airout.airGroups[0].airs[0].name}`]: fixedPols });
+    await getFixedPolsPil2(airout.airGroups[0].name, air, fixedCols, fixedInfo);
 
     airout.name = "build";
     airout.airGroups[0].name = "RecursiveC36";

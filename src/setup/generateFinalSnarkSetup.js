@@ -17,6 +17,7 @@ const { AirOut } = require('../airout.js');
 const compilePil2 = require("pil2-compiler/src/compiler.js");
 const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
 const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
+const { writeFixedPolsBin, readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
 
 
 module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, setupOptions, globalInfo, constRoot, verificationKeys = [], starkInfo, verifierInfo, compressorCols) {
@@ -52,8 +53,10 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     await runWitnessLibraryGeneration(buildDir, filesDir, template, template);
  
     // Generate setup
-    const {exec: execBuff, pilStr, nBits, fixedPols } = await compressorSetup(`${buildDir}/build/${template}.r1cs`, compressorCols);
+    const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await compressorSetup(`${buildDir}/build/${template}.r1cs`, compressorCols);
     
+    await writeFixedPolsBin(`${buildDir}/build/${template}.fixed.bin`, airgroupName, airName, 1 << nBits, fixedPols);
+
     const pilFilename = `${buildDir}/pil/${template}.pil`;
     await fs.promises.writeFile(pilFilename, pilStr, "utf8");
     
@@ -72,8 +75,9 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     const airout = new AirOut(pilFile);
     let air = airout.airGroups[0].airs[0];
 
+    let fixedInfo = {};
+    await readFixedPolsBin(fixedInfo, `${buildDir}/build/${template}.fixed.bin`);
     const fixedCols = generateFixedCols(air.symbols.filter(s => s.airGroupId == 0), air.numRows);
-    await getFixedPolsPil2(airout.airGroups[0].name, air, fixedCols, { [`${airout.airGroups[0].name}_${airout.airGroups[0].airs[0].name}`]: fixedPols });
 
     await fixedCols.saveToFile(`${filesDir}/${template}.const`);
     

@@ -2,7 +2,11 @@ const {
     readBinFile,
     startReadUniqueSection,
     endReadSection,
+    createBinFile,
+    endWriteSection,
+    startWriteSection
 } = require("@iden3/binfileutils");
+const { writeStringToFile } = require("../chelpers/binFile");
 
 const FIXED_POLS_SECTION = 1;
 
@@ -65,4 +69,31 @@ module.exports.readFixedPolsBin = async function readFixedPolsBin(fixedInfo, bin
     await fdBin.close();
 
     fixedInfo[`${airgroupName}_${airName}`] = fixedPolsInfo;
+}
+
+module.exports.writeFixedPolsBin = async function writeFixedPolsBin(binFileName, airgroupName, airName, N, fixedInfo) {
+    const fdBin = await createBinFile(binFileName, "cnst", 1, 1, 1 << 23, 1 << 25);
+    
+    await startWriteSection(fdBin, 1);
+
+    writeStringToFile(fdBin, airgroupName);
+    writeStringToFile(fdBin, airName);
+    await fdBin.writeULE64(N);
+    await fdBin.writeULE32(fixedInfo.length);
+    for(let i = 0; i < fixedInfo.length; ++i) {
+        writeStringToFile(fdBin, fixedInfo[i].name);
+        await fdBin.writeULE32(fixedInfo[i].lengths.length);
+        for(let j = 0; j < fixedInfo[i].lengths.length; ++j) {
+            await fdBin.writeULE32(fixedInfo[i].lengths[j]);
+        }
+        const buff = new Uint8Array(fixedInfo[i].values.length * 8);
+        const view = new DataView(buff.buffer);
+        for(let j = 0; j < fixedInfo[i].values.length; ++j) {
+            view.setBigUint64(j * 8, fixedInfo[i].values[j], true);
+        }
+        await fdBin.write(buff);
+    }
+    await endWriteSection(fdBin);
+
+    await fdBin.close();
 }
