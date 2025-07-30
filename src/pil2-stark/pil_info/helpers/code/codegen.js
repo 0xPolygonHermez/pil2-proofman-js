@@ -85,8 +85,6 @@ function evalExp(ctx, symbols, expressions, exp, prime) {
         return { type: exp.op, id: exp.id, opening: exp.opening, dim: 3 }
     } else if (exp.op == "Zi") {
         return { type: exp.op, boundaryId: exp.boundaryId, dim: 1 }
-    } else if (exp.op === "x") {
-        return { type: exp.op, dim: 1 }
     } else {
         throw new Error(`Invalid op: ${exp.op}`);
     }
@@ -125,7 +123,7 @@ function fixDimensionsVerifier(ctx) {
     }
 
     function getDim(r) {
-        let d = r.type === "tmp" ? tmpDim[r.id] : r.type === "Zi" || r.type === "x" ? 3 : r.dim;
+        let d = r.type === "tmp" ? tmpDim[r.id] : r.type === "Zi" ? 3 : r.dim;
         r.dim = d;
         return d;
     }
@@ -170,17 +168,9 @@ function buildCode(ctx) {
     if(ctx.verifierEvaluations) fixDimensionsVerifier(ctx);
 
     let code = { tmpUsed: ctx.tmpUsed, code: ctx.code };
-    if(ctx.symbolsUsed) {
-        code.symbolsUsed = ctx.symbolsUsed.sort((s1, s2) => {
-            const order = { const: 0, cm: 1, tmp: 2 };
-            if (order[s1.op] !== order[s2.op]) return order[s1.op] - order[s2.op];
-            return s1.stage !== s2.stage ? s1.stage - s2.stage : s1.id - s2.id;
-        });
-    }
-
+    
     ctx.code = [];
     ctx.calculated = [];
-    ctx.symbolsUsed = [];
     ctx.tmpUsed = 0;
 
     return code;

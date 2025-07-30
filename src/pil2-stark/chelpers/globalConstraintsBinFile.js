@@ -4,7 +4,6 @@ const GLOBAL_HINTS_SECTION = 2;
 
 const { createBinFile, startWriteSection, endWriteSection } = require("@iden3/binfileutils");
 const { getParserArgs } = require("./getParserArgs.js");
-const { getGlobalOperations } = require("./utils.js");
 const { writeStringToFile } = require("./binFile.js");
 
 module.exports.writeGlobalConstraintsBinFile = async function writeGlobalConstraintsBinFile(globalInfo, globalConstraintsInfo, globalConstraintsFilename) {    
@@ -12,7 +11,12 @@ module.exports.writeGlobalConstraintsBinFile = async function writeGlobalConstra
 
     const constraintsInfo = [];
 
-    let operations = getGlobalOperations();
+    let operations = [
+        { dest_type: "dim1", src0_type: "dim1", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim3"},
+    ];
+
   
     let numbers = [];
 

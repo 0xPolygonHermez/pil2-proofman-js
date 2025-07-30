@@ -173,7 +173,7 @@ void Poseidon12(uint64_t* im, uint *size_im, uint64_t *out, uint* size_out, uint
         state[i] = Goldilocks::fromU64(in[i]);
     }
 
-
+    uint64_t index = 0;
 #ifdef __AVX2__
     __m256i st0, st1, st2;
     Goldilocks::load_avx(st0, &(state[0]));
@@ -182,6 +182,13 @@ void Poseidon12(uint64_t* im, uint *size_im, uint64_t *out, uint* size_out, uint
 
     matmul_external_avx(st0, st1, st2);
     
+    Goldilocks::store_avx(&(state[0]), st0);
+    Goldilocks::store_avx(&(state[4]), st1);
+    Goldilocks::store_avx(&(state[8]), st2);
+    for (int i = 0; i < 12; i++) {
+        im[index++] = Goldilocks::toU64(state[i]);
+    }
+
     for (int r = 0; r < 4; r++)
     {
         add_avx_small(st0, st1, st2, &(Poseidon2GoldilocksConstants::C[12 * r]));
@@ -192,7 +199,7 @@ void Poseidon12(uint64_t* im, uint *size_im, uint64_t *out, uint* size_out, uint
         Goldilocks::store_avx(&(state[4]), st1);
         Goldilocks::store_avx(&(state[8]), st2);
         for (int i = 0; i < 12; i++) {
-            im[12 * r + i] = Goldilocks::toU64(state[i]);
+            im[index++] = Goldilocks::toU64(state[i]);
         }
     }
     
@@ -215,9 +222,9 @@ void Poseidon12(uint64_t* im, uint *size_im, uint64_t *out, uint* size_out, uint
         Goldilocks::Element sum = partial_sum[0] + partial_sum[1] + partial_sum[2] + partial_sum[3];
         sum = sum - aux;
 
+        im[index++] = Goldilocks::toU64(state0_);
         state0_ = state0_ + Poseidon2GoldilocksConstants::C[4 * 12 + r];
         pow7(state0_);
-
         sum = sum + state0_;    
             
         __m256i scalar1 = _mm256_set1_epi64x(sum.fe);
@@ -229,17 +236,10 @@ void Poseidon12(uint64_t* im, uint *size_im, uint64_t *out, uint* size_out, uint
         Goldilocks::add_avx(st2, st2, scalar1);
         state0_ = state0_ * Poseidon2GoldilocksConstants::D[0] + sum;
         aux = aux * Poseidon2GoldilocksConstants::D[0] + sum;
-
-        if (r == 10) {
-            Goldilocks::store_avx(&(state[0]), st0);
-            Goldilocks::store_avx(&(state[4]), st1);
-            Goldilocks::store_avx(&(state[8]), st2);
-            im[4*12] = Goldilocks::toU64(state0_);
-            for (int i = 1; i < 12; i++) {
-                im[4*12 + i] = Goldilocks::toU64(state[i]);
-            }
-        }
     }
+
+    im[index++] = 0;
+    im[index++] = 0;
 
     Goldilocks::store_avx(&(state[0]), st0);
     state[0] = state0_;
@@ -249,7 +249,7 @@ void Poseidon12(uint64_t* im, uint *size_im, uint64_t *out, uint* size_out, uint
     Goldilocks::store_avx(&(state[4]), st1);
     Goldilocks::store_avx(&(state[8]), st2);
     for (int i = 0; i < 12; i++) {
-        im[5*12 + i] = Goldilocks::toU64(state[i]);
+        im[index++] = Goldilocks::toU64(state[i]);
     }
 
     for (int r = 0; r < 4; r++)
@@ -264,10 +264,9 @@ void Poseidon12(uint64_t* im, uint *size_im, uint64_t *out, uint* size_out, uint
             Goldilocks::store_avx(&(state[4]), st1);
             Goldilocks::store_avx(&(state[8]), st2);
             for (int i = 0; i < 12; i++) {
-                im[(r + 6)*12 + i] = Goldilocks::toU64(state[i]);
+                im[index++] = Goldilocks::toU64(state[i]);
             }
         }
-        
     }
     
     Goldilocks::store_avx(&(state[0]), st0);
@@ -275,32 +274,35 @@ void Poseidon12(uint64_t* im, uint *size_im, uint64_t *out, uint* size_out, uint
     Goldilocks::store_avx(&(state[8]), st2);
 #else
     matmul_external_(state);
-  
+    
+    for(uint64_t i = 0; i < 12; ++i) {
+        im[index++] = Goldilocks::toU64(state[i]);
+    }
+
     for (int r = 0; r < 4; r++)
     {
         pow7add_(state, &(Poseidon2GoldilocksConstants::C[r * 12]));
         matmul_external_(state);
         for(uint64_t i = 0; i < 12; ++i) {
-            im[12*r + i] = Goldilocks::toU64(state[i]);
+            im[index++] = Goldilocks::toU64(state[i]);
         }
     }
 
     for (int r = 0; r < 22; r++)
     {
+        im[index++] = Goldilocks::toU64(state[0]);
         state[0] = state[0] + Poseidon2GoldilocksConstants::C[4 * 12 + r];
         pow7(state[0]);
         Goldilocks::Element sum_ = Goldilocks::zero();
         add_(sum_, state);
         prodadd_(state, Poseidon2GoldilocksConstants::D, sum_);
-        if(r == 10) {
-            for(uint64_t i = 0; i < 12; ++i) {
-                im[4*12 + i] = Goldilocks::toU64(state[i]);
-            }
-        }
     }
 
+    im[index++] = 0;
+    im[index++] = 0;
+
     for(uint64_t i = 0; i < 12; ++i) {
-        im[5*12 + i] = Goldilocks::toU64(state[i]);
+        im[index++] = Goldilocks::toU64(state[i]);
     }
 
     for (int r = 0; r < 4; r++)
@@ -309,7 +311,7 @@ void Poseidon12(uint64_t* im, uint *size_im, uint64_t *out, uint* size_out, uint
         matmul_external_(state);
         if(r < 3) {
             for(uint64_t i = 0; i < 12; ++i) {
-                im[(r + 6) * 12 + i] = Goldilocks::toU64(state[i]);
+                im[index++] = Goldilocks::toU64(state[i]);
             }
         }
     }
@@ -357,6 +359,7 @@ void CustPoseidon12(uint64_t *im,uint *size_im,uint64_t *out, uint* size_out,uin
         state[11] = Goldilocks::fromU64(in[3]);
     }
 
+    uint64_t index = 0;
 #ifdef __AVX2__
     __m256i st0, st1, st2;
     Goldilocks::load_avx(st0, &(state[0]));
@@ -365,6 +368,13 @@ void CustPoseidon12(uint64_t *im,uint *size_im,uint64_t *out, uint* size_out,uin
 
     matmul_external_avx(st0, st1, st2);
     
+    Goldilocks::store_avx(&(state[0]), st0);
+    Goldilocks::store_avx(&(state[4]), st1);
+    Goldilocks::store_avx(&(state[8]), st2);
+    for (int i = 0; i < 12; i++) {
+        im[index++] = Goldilocks::toU64(state[i]);
+    }
+
     for (int r = 0; r < 4; r++)
     {
         add_avx_small(st0, st1, st2, &(Poseidon2GoldilocksConstants::C[12 * r]));
@@ -375,7 +385,7 @@ void CustPoseidon12(uint64_t *im,uint *size_im,uint64_t *out, uint* size_out,uin
         Goldilocks::store_avx(&(state[4]), st1);
         Goldilocks::store_avx(&(state[8]), st2);
         for (int i = 0; i < 12; i++) {
-            im[12 * r + i] = Goldilocks::toU64(state[i]);
+            im[index++] = Goldilocks::toU64(state[i]);
         }
     }
     
@@ -398,11 +408,11 @@ void CustPoseidon12(uint64_t *im,uint *size_im,uint64_t *out, uint* size_out,uin
         Goldilocks::Element sum = partial_sum[0] + partial_sum[1] + partial_sum[2] + partial_sum[3];
         sum = sum - aux;
 
+        im[index++] = Goldilocks::toU64(state0_);
         state0_ = state0_ + Poseidon2GoldilocksConstants::C[4 * 12 + r];
         pow7(state0_);
+        sum = sum + state0_;
 
-        sum = sum + state0_;    
-            
         __m256i scalar1 = _mm256_set1_epi64x(sum.fe);
         Goldilocks::mult_avx(st0, st0, d0);
         Goldilocks::mult_avx(st1, st1, d1);
@@ -412,17 +422,10 @@ void CustPoseidon12(uint64_t *im,uint *size_im,uint64_t *out, uint* size_out,uin
         Goldilocks::add_avx(st2, st2, scalar1);
         state0_ = state0_ * Poseidon2GoldilocksConstants::D[0] + sum;
         aux = aux * Poseidon2GoldilocksConstants::D[0] + sum;
-
-        if (r == 10) {
-            Goldilocks::store_avx(&(state[0]), st0);
-            Goldilocks::store_avx(&(state[4]), st1);
-            Goldilocks::store_avx(&(state[8]), st2);
-            im[4*12] = Goldilocks::toU64(state0_);
-            for (int i = 1; i < 12; i++) {
-                im[4*12 + i] = Goldilocks::toU64(state[i]);
-            }
-        }
     }
+
+    im[index++] = 0;
+    im[index++] = 0;
 
     Goldilocks::store_avx(&(state[0]), st0);
     state[0] = state0_;
@@ -432,7 +435,7 @@ void CustPoseidon12(uint64_t *im,uint *size_im,uint64_t *out, uint* size_out,uin
     Goldilocks::store_avx(&(state[4]), st1);
     Goldilocks::store_avx(&(state[8]), st2);
     for (int i = 0; i < 12; i++) {
-        im[5*12 + i] = Goldilocks::toU64(state[i]);
+        im[index++] = Goldilocks::toU64(state[i]);
     }
 
     for (int r = 0; r < 4; r++)
@@ -447,7 +450,7 @@ void CustPoseidon12(uint64_t *im,uint *size_im,uint64_t *out, uint* size_out,uin
             Goldilocks::store_avx(&(state[4]), st1);
             Goldilocks::store_avx(&(state[8]), st2);
             for (int i = 0; i < 12; i++) {
-                im[(r + 6)*12 + i] = Goldilocks::toU64(state[i]);
+                im[index++] = Goldilocks::toU64(state[i]);
             }
         }
         
@@ -458,32 +461,34 @@ void CustPoseidon12(uint64_t *im,uint *size_im,uint64_t *out, uint* size_out,uin
     Goldilocks::store_avx(&(state[8]), st2);
 #else
     matmul_external_(state);
-  
+    
+    for(uint64_t i = 0; i < 12; ++i) {
+        im[index++] = Goldilocks::toU64(state[i]);
+    }
+
     for (int r = 0; r < 4; r++)
     {
         pow7add_(state, &(Poseidon2GoldilocksConstants::C[r * 12]));
         matmul_external_(state);
         for(uint64_t i = 0; i < 12; ++i) {
-            im[(12 * r) + i] = Goldilocks::toU64(state[i]);
+            im[index++] = Goldilocks::toU64(state[i]);
         }
     }
 
     for (int r = 0; r < 22; r++)
     {
+        im[index++] = Goldilocks::toU64(state[0]);
         state[0] = state[0] + Poseidon2GoldilocksConstants::C[4 * 12 + r];
         pow7(state[0]);
         Goldilocks::Element sum_ = Goldilocks::zero();
         add_(sum_, state);
         prodadd_(state, Poseidon2GoldilocksConstants::D, sum_);
-        if(r == 10) {
-            for(uint64_t i = 0; i < 12; ++i) {
-                im[4*12 + i] = Goldilocks::toU64(state[i]);
-            }
-        }
     }
 
+    im[index++] = 0;
+    im[index++] = 0;
     for(uint64_t i = 0; i < 12; ++i) {
-        im[5*12 + i] = Goldilocks::toU64(state[i]);
+        im[index++] = Goldilocks::toU64(state[i]);
     }
 
     for (int r = 0; r < 4; r++)
@@ -492,7 +497,7 @@ void CustPoseidon12(uint64_t *im,uint *size_im,uint64_t *out, uint* size_out,uin
         matmul_external_(state);
         if(r < 3) {
             for(uint64_t i = 0; i < 12; ++i) {
-                im[(r + 6)*12 + i] = Goldilocks::toU64(state[i]);
+                im[index++] = Goldilocks::toU64(state[i]);
             }
         }
     }

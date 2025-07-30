@@ -13,8 +13,8 @@ const childProcess = require('child_process'); // Split into two lines for clari
 const exec = util.promisify(childProcess.exec);
 const {tmpName} = require("tmp-promise");
 
-module.exports = async function pilInfo(F, pil, pil2 = true, starkStruct, options = {}) {
-    const infoPil = preparePil(F, pil, starkStruct, pil2, options);
+module.exports = async function pilInfo(pil, starkStruct, options = {}) {
+    const infoPil = preparePil(pil, starkStruct, options);
     
     const expressions = infoPil.expressions;
     const constraints = infoPil.constraints;
@@ -66,6 +66,8 @@ module.exports = async function pilInfo(F, pil, pil2 = true, starkStruct, option
     let nColumnsBaseField = 0;
     let nColumns = 0;
     summary = `nBits: ${res.starkStruct.nBits} | blowUpFactor: ${res.starkStruct.nBitsExt - res.starkStruct.nBits} | maxConstraintDegree: ${res.qDeg + 1} `;
+    console.log(`Columns fixed: ${res.mapSectionsN.const} -> Columns in the basefield: ${res.mapSectionsN.const}`);
+    summary += `| Fixed: ${res.mapSectionsN.const} `;  
     for(let i = 1; i <= res.nStages + 1; ++i) {
         let stage = i;
         let stageDebug = i === res.nStages + 1 ? "Q" : stage;

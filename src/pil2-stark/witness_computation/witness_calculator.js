@@ -1,6 +1,5 @@
 const fs = require("fs");
 const BigBuffer = require("./big_buffer");
-const F3g = require("../utils/f3g");
 
 function generateMultiArrayIndexes(symbols, name, lengths, polId, stage, indexes = []) {
     if (indexes.length === lengths.length) {
@@ -25,16 +24,16 @@ function setValueMultiArray(arr, indexes, value) {
     } 
 }
     
-module.exports.generateFixedCols = function generateFixedCols(symbols, degree, pil2 = true) {
+module.exports.generateFixedCols = function generateFixedCols(symbols, degree) {
     const fixedSymbols = [];
-    const nSymbols = pil2 ? symbols.length : Object.keys(symbols).length;
+    const nSymbols = symbols.length;
     for (let i = 0; i < nSymbols; ++i) {
-        const symbol = pil2 ? symbols[i] : symbols[Object.keys(symbols)[i]];
-        const name = pil2 ? symbol.name : Object.keys(symbols)[i];
+        const symbol = symbols[i];
+        const name = symbol.name;
         const stage = symbol.stage;
         const id = symbol.id;
-        const lengths = pil2 ? (symbol.lengths || []) : symbol.isArray ? [ symbol.len ] : [];
-        if((pil2 && (stage !== 0 || symbol.type !== 1)) || (!pil2 && symbol.type !== "constP")) continue;
+        const lengths = (symbol.lengths || []);
+        if((stage !== 0 || symbol.type !== 1)) continue;
         if(!lengths.length) {
             fixedSymbols.push({name, id, stage, lengths});
         } else {
@@ -46,33 +45,11 @@ module.exports.generateFixedCols = function generateFixedCols(symbols, degree, p
     return fixedCols;
 }
 
-module.exports.generateWtnsCols = function generateWtnsCols(symbols, degree, pil2 = true) {
-    const witnessSymbols = [];
-    const nSymbols = pil2 ? symbols.length : Object.keys(symbols).length;
-    for (let i = 0; i < nSymbols; ++i) {
-        const symbol = pil2 ? symbols[i] : symbols[Object.keys(symbols)[i]];
-        const name = pil2 ? symbol.name : Object.keys(symbols)[i];
-        const stage = symbol.stage;
-        if((pil2 && (stage !== 1 || symbol.type !== 3)) || (!pil2 && symbol.type !== "cmP")) continue;
-        const id = symbol.id;
-        const lengths = pil2 ? (symbol.lengths || []) : symbol.isArray ? [ symbol.len ] : [];
-        if(!lengths.length) {
-            witnessSymbols.push({name, id, lengths: [], stage });
-        } else {
-            generateMultiArrayIndexes(witnessSymbols, name, lengths, id, stage);
-        }
-    }
-    
-    const wtnsCols = new ColsPil2(witnessSymbols, degree);
-    return wtnsCols;
-}
-
 class ColsPil2 {
     constructor(symbols, degree) {
         this.$$def = {};
         this.$$defArray = [];
 
-        this.F = new F3g();
         this.$$n = degree;
         this.$$nCols = symbols.length;
         this.$$buffer = [];
@@ -115,14 +92,13 @@ class ColsPil2 {
         const nCols = this.$$nCols;
         const buff = this.$$buffer;
         const N = this.$$n;
-        const F = this.F;
 
         return new Proxy([], {
             set(target, prop, value) {
                 const pos = parseInt(prop, 10);
                 const buffIndex = nCols * pos + symbolId;
                 
-                if(value < 0n) value += F.p;
+                if(value < 0n) value += 0xFFFFFFFF00000001n;
 
                 buff.setElement(buffIndex,value);
                 
@@ -204,7 +180,7 @@ class ColsPil2 {
         for (let i=0; i<this.$$n; i++) {
             for(let j = 0; j < this.$$nCols; ++j) {
                 let c = i*this.$$nCols + j;
-                const value = (this.$$buffer.getElement(c) < 0n) ? (this.$$buffer.getElement(c) + this.F.p) : this.$$buffer.getElement(c);
+                const value = (this.$$buffer.getElement(c) < 0n) ? (this.$$buffer.getElement(c) + 0xFFFFFFFF00000001n) : this.$$buffer.getElement(c);
                 buff.setElement(p++, value);
             }
             for(let j = this.$$nCols; j < nCols; ++j) buff.setElement(p++, 0n);
