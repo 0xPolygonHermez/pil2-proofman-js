@@ -1,12 +1,11 @@
 
 
 const { addInfoExpressions } = require("./helpers.js");
-const { generatePil1Polynomials } = require("./pil1/generatePil1Polynomials.js");
-const { getPiloutInfo } = require("./pil2/piloutInfo.js");
+const { getPiloutInfo } = require("../piloutInfo.js");
 const { generateConstraintPolynomial } = require("./polynomials/constraintPolynomial.js");
 
 
-module.exports.preparePil = function preparePil(F, pil, starkStruct, pil2, options = {}) {
+module.exports.preparePil = function preparePil(pil, starkStruct, options = {}) {
     const res = {};
 
     res.name = pil.name;
@@ -19,7 +18,6 @@ module.exports.preparePil = function preparePil(F, pil, starkStruct, pil2, optio
     res.proofValuesMap = [];
     res.airgroupValuesMap = [];
     res.airValuesMap = [];
-    res.pil2 = pil2;
 
     res.mapSectionsN = {
         "const": 0,
@@ -31,11 +29,7 @@ module.exports.preparePil = function preparePil(F, pil, starkStruct, pil2, optio
         pil.expressions[i].stage = 1;
     }
     
-    if(pil2) {
-        ({expressions, symbols, hints, constraints} = getPiloutInfo(res, pil));
-    } else {
-        ({expressions, symbols, hints, constraints} = generatePil1Polynomials(F, res, pil, options));   
-    }
+    ({expressions, symbols, hints, constraints} = getPiloutInfo(res, pil));
 
     for(let s = 1; s <= res.nStages + 1; s++) {
         res.mapSectionsN["cm" + s] = 0;

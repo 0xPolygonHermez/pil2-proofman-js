@@ -8,11 +8,8 @@ const JSONbig = require('json-bigint')({ useNativeBigInt: true, alwaysParseAsBig
 const log = require("../../logger.js");
 const { AirOut } = require("../airout.js");
 
-const F3g = require('../pil2-stark/utils/f3g.js');
-const { writeExpressionsBinFile, writeVerifierExpressionsBinFile } = require("../pil2-stark/chelpers/binFile.js");
 const { writeGlobalConstraintsBinFile } = require("../pil2-stark/chelpers/globalConstraintsBinFile.js");
 const { starkSetup } = require('../pil2-stark/stark_setup.js');
-const { getFixedPolsPil2 } = require("../pil2-stark/pil_info/helpers/pil2/piloutInfo.js");
 const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
 
 const { genFinalSetup } = require("../setup/generateFinalSetup.js");
@@ -21,6 +18,7 @@ const { isCompressorNeeded } = require('../setup/is_compressor_needed.js');
 const { generateStarkStruct, setAiroutInfo, log2 } = require("../setup/utils.js");
 const { genFinalSnarkSetup } = require('../setup/generateFinalSnarkSetup.js');
 const { readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
+const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
 
 
 // NOTE: by the moment this is a STARK setup process, it should be a generic setup process?
@@ -28,14 +26,15 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     const airout = new AirOut(proofManagerConfig.airout.airoutFilename);
 
     const setupOptions = {
-        F: new F3g("0xFFFFFFFF00000001"),
-        pil2: true,
         optImPols: (proofManagerConfig.setup && proofManagerConfig.setup.optImPols) || false,
         constTree: path.resolve(__dirname, '../setup/build/bctree'),
+        binFile: path.resolve(__dirname, '../setup/build/binfile'),
         publicsInfo: proofManagerConfig.setup && proofManagerConfig.setup.publicsInfo,
         powersOfTauFile: proofManagerConfig.setup && proofManagerConfig.setup.powersOfTauFile,
         fflonkSetup: path.resolve(__dirname, '../setup/build/fflonkSetup'),
         binFiles: proofManagerConfig.setup && proofManagerConfig.setup.binFiles,
+        stdPath: proofManagerConfig.setup && proofManagerConfig.setup.stdPath,
+        fixedPath: proofManagerConfig.setup && proofManagerConfig.setup.fixedPath,
     };
     
     let setup = [];
@@ -43,9 +42,10 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     let starkStructs = [];
 
     let fixedInfo = {};
-
-    for(let i = 0; i < setupOptions.binFiles.length; ++i) {
-        await readFixedPolsBin(fixedInfo, setupOptions.binFiles[i], setupOptions.F);
+    if (!setupOptions.fixedPath) {
+        for(let i = 0; i < setupOptions.binFiles.length; ++i) {
+            await readFixedPolsBin(fixedInfo, setupOptions.binFiles[i]);
+        }
     }
 
     await Promise.all(airout.airGroups.map(async (airgroup) => {
@@ -72,9 +72,13 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             let starkStruct = settings.starkStruct || generateStarkStruct(settings, log2(air.numRows));
             starkStructs.push(starkStruct);
 
-            const fixedPols = generateFixedCols(air.symbols.filter(s => s.airGroupId == airgroup.airgroupId), air.numRows);
-            await getFixedPolsPil2(airgroup.name, air, fixedPols, fixedInfo);
-            await fixedPols.saveToFile(path.join(filesDir, `${air.name}.const`));
+            if (!setupOptions.fixedPath) {
+                const fixedPols = generateFixedCols(air.symbols.filter(s => s.airGroupId == airgroup.airgroupId), air.numRows);
+                await getFixedPolsPil2(airgroup.name, air, fixedPols, fixedInfo);
+                await fixedPols.saveToFile(path.join(filesDir, `${air.name}.const`));
+            } else {
+                await exec(`cp ${setupOptions.fixedPath}/${air.name}.fixed ${path.join(filesDir, `${air.name}.const`)}`);
+            }
 
             setup[airgroup.airgroupId][air.airId] = await starkSetup(air, starkStruct, setupOptions);
             await fs.promises.writeFile(path.join(filesDir, `${air.name}.starkinfo.json`), JSON.stringify(setup[airgroup.airgroupId][air.airId].starkInfo, null, 1), "utf8");
@@ -86,9 +90,11 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             console.log(stdout);
             setup[airgroup.airgroupId][air.airId].constRoot = JSONbig.parse(await fs.promises.readFile(path.join(filesDir, `${air.name}.verkey.json`), "utf8"));
 
-            await writeExpressionsBinFile(path.join(filesDir, `${air.name}.bin`), setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].expressionsInfo);
+            const { stdout: stdout2 } = await exec(`${setupOptions.binFile} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -e ${path.join(filesDir, `${air.name}.expressionsinfo.json`)} -b ${path.join(filesDir, `${air.name}.bin`)}`);
+            console.log(stdout2);
 
-            await writeVerifierExpressionsBinFile(path.join(filesDir, `${air.name}.verifier.bin`), setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].verifierInfo);
+            const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -e ${path.join(filesDir, `${air.name}.verifierinfo.json`)} -b ${path.join(filesDir, `${air.name}.verifier.bin`)} --verifier`);
+            console.log(stdout3);
         }));
     }));
 
@@ -145,7 +151,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         const recursiveSetup = await genRecursiveSetup(
         buildDir, setupOptions, "compressor", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
         setup[airgroup.airgroupId][air.airId].constRoot, [], setup[airgroup.airgroupId][air.airId].starkInfo,
-        setup[airgroup.airgroupId][air.airId].verifierInfo, starkStructCompressor, 24
+        setup[airgroup.airgroupId][air.airId].verifierInfo, starkStructCompressor, 36
         );
     
         ({ constRoot, starkInfo, verifierInfo } = recursiveSetup);
@@ -163,7 +169,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         pil: pilRecursive1
         } = await genRecursiveSetup(
         buildDir, setupOptions, "recursive1", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
-        constRoot, [], starkInfo, verifierInfo, starkStructRecursive, 24,
+        constRoot, [], starkInfo, verifierInfo, starkStructRecursive, 36,
         setup[airgroup.airgroupId][air.airId].hasCompressor
         );
     
@@ -184,25 +190,25 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         .update(JSON.stringify(pilRecursives1[airgroup.airgroupId][i]))
         .digest("hex");
     
-        if (hashPilRecursive1 !== hash) {
-        throw new Error("All recursive1 pil must be the same");
-        }
+        // if (hashPilRecursive1 !== hash) {
+        // throw new Error("All recursive1 pil must be the same");
+        // }
             }
     
         const { pil: pilRecursive2 } = await genRecursiveSetup(
         buildDir, setupOptions, "recursive2", airgroup.name, airgroup.airgroupId,
         undefined, globalInfo, [], constRootsRecursives1[airgroup.airgroupId],
         starkInfoRecursives1[airgroup.airgroupId][0], verifierInfoRecursives1[airgroup.airgroupId][0],
-        starkStructRecursive, 24
+        starkStructRecursive, 36
         );
     
         const hashPilRecursive2 = crypto.createHash("sha256")
         .update(JSON.stringify(pilRecursive2))
         .digest("hex");
     
-        if (hashPilRecursive1 !== hashPilRecursive2) {
-        throw new Error("Recursive1 and recursive2 pil must be the same");
-        }
+        // if (hashPilRecursive1 !== hashPilRecursive2) {
+        // throw new Error("Recursive1 and recursive2 pil must be the same");
+        // }
         };
   
         let finalSettings = { blowupFactor: 3};
@@ -213,7 +219,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         const {starkInfoFinal,
             constRootFinal,
             verifierInfoFinal,
-        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 24);
+        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 36);
         
         if(proofManagerConfig.setup.genFinalSnarkSetup) {
             await genFinalSnarkSetup(

@@ -132,13 +132,6 @@ class ExpressionOps {
             boundaryId,
         }
     }
-
-    x() {
-        return {
-            op: "x"
-        }
-    }
-
 }
 
 module.exports = ExpressionOps;

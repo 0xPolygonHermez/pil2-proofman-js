@@ -3,8 +3,6 @@ const { createBinFile,
     startWriteSection
      } = require("@iden3/binfileutils");
 const { getParserArgs } = require("./getParserArgs.js");
-const { getParserArgsPil1 } = require("./getParserArgsPil1.js");
-const { getAllOperations } = require("./utils.js");
 
 const CHELPERS_NSECTIONS = 3;
 const CHELPERS_EXPRESSIONS_SECTION = 1;
@@ -282,7 +280,11 @@ async function prepareExpressionsBin(starkInfo, expressionsInfo) {
     const numbersExps = [];
     const numbersConstraints = [];
 
-    let operations = getAllOperations();
+    let operations = [
+        { dest_type: "dim1", src0_type: "dim1", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim3"},
+    ];
 
     const N = 1 << (starkInfo.starkStruct.nBits);
 
@@ -313,9 +315,6 @@ async function prepareExpressionsBin(starkInfo, expressionsInfo) {
 
         const {expsInfo: constraintInfo} = getParserArgs(starkInfo, operations, constraintCode, numbersConstraints);
 
-        // const {expsInfo: constraintInfo} = starkInfo.pil2 
-        //     ? getParserArgs(starkInfo, operations, constraintCode, numbersConstraints)
-        //     : getParserArgsPil1(starkInfo, operations, constraintCode, numbersConstraints);
         constraintInfo.stage = constraintCode.stage;
         constraintInfo.firstRow = firstRow;
         constraintInfo.lastRow = lastRow;
@@ -346,7 +345,7 @@ async function prepareExpressionsBin(starkInfo, expressionsInfo) {
         if(expInfo.nTemp1 > maxTmp1) maxTmp1 = expInfo.nTemp1;
         if(expInfo.nTemp3 > maxTmp3) maxTmp3 = expInfo.nTemp3;
         if(expInfo.args.length > maxArgs) maxArgs = expInfo.args.length;
-        if(expInfo.ops.length > maxOps) maxOps = expInfo
+        if(expInfo.ops.length > maxOps) maxOps = expInfo.ops.length;
     }
     
     const res = {
@@ -358,7 +357,12 @@ async function prepareExpressionsBin(starkInfo, expressionsInfo) {
 
 async function prepareVerifierExpressionsBin(starkInfo, verifierInfo) {
     
-    let operations = getAllOperations();
+    let operations = [
+        { dest_type: "dim1", src0_type: "dim1", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim3"},
+    ];
+
 
     let maxTmp1 = 0;
     let maxTmp3 = 0;
