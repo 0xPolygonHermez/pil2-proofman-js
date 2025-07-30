@@ -58,14 +58,27 @@ module.exports.addIntermediatePolynomials = function addIntermediatePolynomials(
         };
         expressions.push(e);
         addInfoExpressions(expressions, e);
+        let constraintId = expressions.length - 1;
 
-        constraints.push({ e: expressions.length - 1, boundary: "everyRow", filename: `${res.name}.ImPol`, stage: expressions[expId].stage });
+        constraints.push({ e: constraintId, boundary: "everyRow", filename: `${res.name}.ImPol`, stage: expressions[expId].stage });
         
         expressions[res.cExpId] = E.add(E.mul(vc, expressions[res.cExpId]), e);
+
+        const weightedConstraint = E.mul(vc, E.exp(res.cExpId, 0, stage));
+        expressions.push(weightedConstraint);
+        let weightedConstraintId = expressions.length - 1;
+        addInfoExpressions(expressions, weightedConstraint);
+
+        const accumulatedConstraints = E.add(E.exp(weightedConstraintId, 0, stage), E.exp(constraintId, 0, stage));
+        expressions.push(accumulatedConstraints);
+        addInfoExpressions(expressions, accumulatedConstraints);
+        res.cExpId = expressions.length - 1;
     }
 
-    expressions[res.cExpId] = E.mul(expressions[res.cExpId], E.zi(res.boundaries.findIndex(b => b.name === "everyRow")));
-    expressions[res.cExpId].stage = res.nStages + 1;
+    let q = E.mul(expressions[res.cExpId], E.zi(res.boundaries.findIndex(b => b.name === "everyRow")));
+    expressions.push(q);
+    addInfoExpressions(expressions, q);
+    res.cExpId++;
     
     let cExpDim = getExpDim(expressions, res.cExpId);
     expressions[res.cExpId].dim = cExpDim;

@@ -1,6 +1,6 @@
 const ExpressionOps = require("../../expressionops");
 const { calculateExpDeg } = require("../../imPolsCalculation/imPolynomials");
-const { getExpDim } = require("../helpers");
+const { getExpDim, addInfoExpressions } = require("../helpers");
 
 module.exports.generateConstraintPolynomial = function generateConstraintPolynomial(res, expressions, symbols, constraints) {
 
@@ -16,12 +16,11 @@ module.exports.generateConstraintPolynomial = function generateConstraintPolynom
 
     vc.expDeg = 0;
     
-    res.cExpId = expressions.length;
-
     for (let i=0; i<constraints.length; i++) {
         const boundary = constraints[i].boundary;
         if(!["everyRow", "firstRow", "lastRow", "everyFrame"].includes(boundary)) throw new Error("Boundary " + boundary + " not supported");
         let e = E.exp(constraints[i].e, 0, stage);
+        let constraintId = constraints[i].e;
         if(boundary === "everyFrame") {
             let boundaryId = res.boundaries.findIndex(b => b.name === "everyFrame" && b.offsetMin === constraints[i].offsetMin && b.offsetMax === constraints[i].offsetMax);
             if(boundaryId == -1) {
@@ -29,6 +28,8 @@ module.exports.generateConstraintPolynomial = function generateConstraintPolynom
                 boundaryId = res.boundaries.length - 1;
             }
             e = E.mul(e, E.zi(boundaryId));
+            expressions.push(e);
+            constraintId = expressions.length - 1;
         } else if(boundary !== "everyRow") {
             let boundaryId = res.boundaries.findIndex(b => b.name === boundary);
             if(boundaryId == -1) {
@@ -36,15 +37,25 @@ module.exports.generateConstraintPolynomial = function generateConstraintPolynom
                 boundaryId = res.boundaries.length - 1;
             }
             e = E.mul(e, E.zi(boundaryId));
-        }
-        if(expressions.length === res.cExpId) {
             expressions.push(e);
+            constraintId = expressions.length - 1;
+        }
+
+        if (i === 0) {
+            res.cExpId = constraintId;
         } else {
-            expressions[res.cExpId] = E.add(E.mul(vc, expressions[res.cExpId]), e)
+            const weightedConstraint = E.mul(vc, E.exp(res.cExpId, 0, stage));
+            expressions.push(weightedConstraint);
+            let weightedConstraintId = expressions.length - 1;
+            addInfoExpressions(expressions, weightedConstraint);
+
+            const accumulatedConstraints = E.add(E.exp(weightedConstraintId, 0, stage), E.exp(constraintId, 0, stage));
+            expressions.push(accumulatedConstraints);
+            addInfoExpressions(expressions, accumulatedConstraints);
+            res.cExpId = expressions.length - 1;
         }
     }
-    
-    
+        
     res.qDim = getExpDim(expressions, res.cExpId);
 
     const xi_id = symbols.filter(s => s.type === "challenge" && s.stage < stage + 1).length;
