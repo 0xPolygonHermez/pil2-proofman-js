@@ -69,7 +69,7 @@ module.exports.addInfoExpressions = function addInfoExpressions(expressions, exp
     } else if(["add", "sub", "mul", "neg"].includes(exp.op)) {
         if(exp.op === "neg") {
             exp.op = "mul";
-            exp.values = [{op: "number", value: "-1", expDeg: 0, stage: 0, dim: 1}, exp.values[0]];
+            exp.values = [{op: "number", value: "18446744069414584320", expDeg: 0, stage: 0, dim: 1}, exp.values[0]];
         }
         const lhsValue = exp.values[0];
         const rhsValue = exp.values[1];
