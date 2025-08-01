@@ -163,7 +163,8 @@ module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buil
 
     // Compile circom
     console.log("Compiling " + circomName + "...");
-    const circomExecFile = process.platform === 'darwin' ? path.resolve(__dirname, 'circom/circom_mac') : path.resolve(__dirname, 'circom/circom');
+    const circomExecutable = process.platform === 'darwin' ? 'circom_mac' : 'circom';
+    const circomExecFile = path.resolve(__dirname, `circom/${circomExecutable}`);
 
     const compileRecursiveCommand = `${circomExecFile} --O1 --r1cs --prime goldilocks --c --verbose -l ${starkRecurserCircuits} -l ${circuitsGLPath} ${circomPath} -o ${buildDir}/build`;
     await exec(compileRecursiveCommand);
