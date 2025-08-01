@@ -143,7 +143,7 @@ inline bool Goldilocks::toS32(int32_t &result, const Element &in1)
 
     if (out > maxInt)
     {
-        mpz_class onegative= gl - out;
+        mpz_class onegative = gl - out;
         if (out > minInt)
         {
             result = -onegative.get_si();
