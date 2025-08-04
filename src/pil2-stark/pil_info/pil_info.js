@@ -101,6 +101,10 @@ module.exports = async function pilInfo(pil, starkStruct, options = {}) {
     console.log(`Total Constraints: ${constraints.length}`)
     if(!options.debug) console.log(`Number of opening points: ${res.openingPoints.length}`)
     if(!options.debug) console.log(`Number of evaluations: ${res.evMap.length}`)
+
+    let prover_memory = getProverMemory(res);
+    console.log(`Prover memory: ${prover_memory} GB`);
+    summary += `| Prover memory: ${prover_memory} GB`;
     console.log("------------------------------------------------------------")
     console.log(`SUMMARY | ${pil.name} | ${summary}`);
     console.log("------------------------------------------------------------")
@@ -113,5 +117,64 @@ module.exports = async function pilInfo(pil, starkStruct, options = {}) {
     delete res.imPolsInfo;
 
     return {pilInfo: res, expressionsInfo, verifierInfo, stats};
+}
 
+function getNumNodesMT(height, starkStruct) {
+    let numNodes = height;
+    let nodesLevel = height;
+
+    while (nodesLevel > 1) {
+        let extraZeros = (starkStruct.merkleTreeArity - (nodesLevel % starkStruct.merkleTreeArity)) % starkStruct.merkleTreeArity;
+        numNodes += extraZeros;
+        let nextN = (nodesLevel + (starkStruct.merkleTreeArity - 1))/starkStruct.merkleTreeArity;
+        numNodes += nextN;
+        nodesLevel = nextN;
+    }
+
+    return numNodes * 4;
+}
+
+function getProverMemory(res) {
+    let prover_memory = 0;
+    
+    let n_extended = 1 << res.starkStruct.nBitsExt;
+    let n = 1 << res.starkStruct.nBits;
+
+    let num_nodes = getNumNodesMT(n_extended, res.starkStruct);
+    
+
+    for (let i = 0; i < res.customCommits.length; ++i) {
+        if (res.customCommits[i].stageWidths[0] > 0) {
+            prover_memory += res.customCommits[i].stageWidths[0] * (n + n_extended) + num_nodes;
+        }
+    }
+    
+    prover_memory += 2 + n_extended * res.nConstants + num_nodes;
+
+    let offset_traces = 0;
+    for(let i = 1; i <= res.nStages + 1; ++i) {
+        if (i == 2) {
+            offset_traces = prover_memory;
+        }
+        prover_memory += res.mapSectionsN["cm" + i] * (1 << res.starkStruct.nBitsExt) + num_nodes;
+    }
+
+    offset_traces += n * res.nConstants;
+    for(let i = res.nStages; i >= 1; --i) {
+        offset_traces += res.mapSectionsN["cm" + i] * n;
+    }
+
+    if (offset_traces > prover_memory) {
+        prover_memory = offset_traces;
+    }
+
+    prover_memory += (3 + 3 + res.boundaries.length) * n_extended;
+    
+    for(let i = 0; i < res.starkStruct.steps.length - 1; ++i) {
+        let height = 1 << res.starkStruct.steps[i + 1].nBits;
+        let width = ((1 << res.starkStruct.steps[i].nBits) / height) * 3;
+        prover_memory += height * width + getNumNodesMT(height, res.starkStruct);
+    }
+
+    return (prover_memory * 8 / (1024 * 1024 * 1024)).toFixed(2);
 }
