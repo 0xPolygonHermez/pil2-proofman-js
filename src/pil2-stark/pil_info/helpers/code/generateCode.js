@@ -135,7 +135,9 @@ module.exports.generateConstraintPolynomialVerifierCode = function generateConst
     ctx.evMap.sort((a, b) => {
         const a_type = ["const", "cm"].includes(a.type) ? a.type : `custom${a.commitId}`;
         const b_type = ["const", "cm"].includes(b.type) ? b.type : `custom${b.commitId}`;
-        if(typeOrder[a_type] !== typeOrder[b_type]) {
+        if(a.openingPos != b.openingPos) {
+            return a.openingPos - b.openingPos;
+        } else if(typeOrder[a_type] !== typeOrder[b_type]) {
             return typeOrder[b_type] - typeOrder[a_type];
         } else if(a.id !== b.id) {
             return a.id - b.id;
