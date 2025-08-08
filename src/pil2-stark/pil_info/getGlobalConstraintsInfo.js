@@ -39,7 +39,7 @@ module.exports.getGlobalConstraintsInfo = function getGlobalConstraintsInfo(res,
         }     
     }
 
-    const globalHints = pilout.hints.filter(h => h.airId === undefined && h.airgroupId === undefined);
+    const globalHints = pilout.hints ? pilout.hints.filter(h => h.airId === undefined && h.airgroupId === undefined) : [];
 
     if(globalHints) {
         const hints = formatHints(pilout, globalHints, symbols, expressions, true);
