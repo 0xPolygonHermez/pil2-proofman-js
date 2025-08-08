@@ -68,7 +68,7 @@ function processHintField(hintField, pilout, symbols, expressions, global = fals
         if (hintField.operand) {
             value = formatExpression(hintField.operand, pilout, symbols, global);
             if (value.op === "exp") expressions[value.id].keep = true;
-        } else if (hintField.stringValue) {
+        } else if (hintField.stringValue !== undefined) {
             value = { op: "string", string: hintField.stringValue };
         } else {
             throw new Error("Unknown hint field");
