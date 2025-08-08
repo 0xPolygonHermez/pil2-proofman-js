@@ -151,6 +151,10 @@ function getProverMemory(res) {
     
     prover_memory += 2 + n_extended * res.nConstants + num_nodes;
 
+    if (((res.nConstants * n * 8) / (1024 * 1024)) < 512) {
+        prover_memory += n * res.nConstants;
+    }
+
     let offset_traces = 0;
     for(let i = 1; i <= res.nStages + 1; ++i) {
         if (i == 2) {
@@ -159,7 +163,6 @@ function getProverMemory(res) {
         prover_memory += res.mapSectionsN["cm" + i] * (1 << res.starkStruct.nBitsExt) + num_nodes;
     }
 
-    offset_traces += n * res.nConstants;
     for(let i = res.nStages; i >= 1; --i) {
         offset_traces += res.mapSectionsN["cm" + i] * n;
     }
