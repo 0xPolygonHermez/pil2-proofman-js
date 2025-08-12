@@ -41,7 +41,8 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
  
     // Compile circom
     console.log("Compiling " + template + "...");
-    const circomExecFile = path.resolve(__dirname, 'circom/circom');
+    const circomExecutable = process.platform === 'darwin' ? 'circom/circom_mac' : 'circom/circom';
+    const circomExecFile = path.resolve(__dirname, circomExecutable);
     const compileRecursiveCommand = `${circomExecFile} --O1 --r1cs --prime goldilocks --c --verbose -l ${starkRecurserCircuits} -l ${circuitsGLPath} ${buildDir}/circom/${template}.circom -o ${buildDir}/build`;
     await exec(compileRecursiveCommand);
  
