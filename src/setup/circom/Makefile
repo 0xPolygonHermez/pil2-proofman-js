@@ -31,17 +31,16 @@ ifeq ($(UNAME_S),Darwin)
          -L$(HOMEBREW_PREFIX)/opt/gmp/lib -L$(SDKPATH)/usr/lib -lpthread -lgmpxx -lgmp -lomp
 
 else ifeq ($(UNAME_S),Linux)
-
-	CXX := g++
-	CXXFLAGS := -std=c++17 -Wall -pthread -flarge-source-files -Wno-unused-label -rdynamic -mavx2 $(OPT_LEVEL) -fPIC #-Wfatal-errors
-	CFLAGS := -fopenmp -Wno-unused-variable
-	CPPFLAGS := $(INC_FLAGS) -MMD -MP
-	# AVX2 detection
-	AVX2_SUPPORTED := $(shell cat /proc/cpuinfo | grep -E 'avx2' -m 1)
-	ifneq ($(AVX2_SUPPORTED),)
-		CXXFLAGS += -mavx2 -D__AVX2__ -D__USE_ASSEMBLY__
-		$(info AVX2 is supported by the CPU)
-	endif
+    CXX := g++
+    CXXFLAGS := -std=c++17 -Wall -pthread -flarge-source-files -Wno-unused-label -rdynamic -mavx2 $(OPT_LEVEL) -fPIC #-Wfatal-errors
+    CFLAGS := -fopenmp -Wno-unused-variable
+    CPPFLAGS := $(INC_FLAGS) -MMD -MP
+    # AVX2 detection
+    AVX2_SUPPORTED := $(shell cat /proc/cpuinfo | grep -E 'avx2' -m 1)
+    ifneq ($(AVX2_SUPPORTED),)
+        CXXFLAGS += -mavx2 -D__AVX2__ -D__USE_ASSEMBLY__
+        $(info AVX2 is supported by the CPU)
+    endif
 endif
 
 witness: $(WITNESS_DIR)/$(WITNESS_FILE)
