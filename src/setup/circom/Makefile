@@ -29,7 +29,6 @@ ifeq ($(UNAME_S),Darwin)
         -Xpreprocessor -fopenmp
     CFLAGS = -rdynamic -L$(HOMEBREW_PREFIX)/lib -L$(HOMEBREW_PREFIX)/opt/libomp/lib \
          -L$(HOMEBREW_PREFIX)/opt/gmp/lib -L$(SDKPATH)/usr/lib -lpthread -lgmpxx -lgmp -lomp
-
 else ifeq ($(UNAME_S),Linux)
     CXX := g++
     CXXFLAGS := -std=c++17 -Wall -pthread -flarge-source-files -Wno-unused-label -rdynamic -mavx2 $(OPT_LEVEL) -fPIC #-Wfatal-errors
