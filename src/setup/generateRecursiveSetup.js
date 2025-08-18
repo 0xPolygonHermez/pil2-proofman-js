@@ -9,7 +9,7 @@ const {genCircom} = require('stark-recurser/src/gencircom.js');
 const ffjavascript = require("ffjavascript");
 
 const path = require('path');
-const { runWitnessLibraryGeneration } = require('./generateWitness');
+const { runWitnessLibraryGeneration, witnessLibraryGenerationAwait } = require('./generateWitness');
 const { writeExpressionsBinFile, writeVerifierExpressionsBinFile } = require("../pil2-stark/chelpers/binFile.js");
 const { starkSetup } = require('../pil2-stark/stark_setup');
 const { AirOut } = require('../airout.js');
@@ -229,4 +229,6 @@ module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buil
     await fs.promises.writeFile(`${buildDir}/provingKey/pilout.globalInfo.json`, JSON.stringify(globalInfo, null, 1), "utf8");
     await fs.promises.writeFile(`${buildDir}/provingKey/pilout.globalConstraints.json`, JSON.stringify(globalConstraints, null, 1), "utf8");
     await writeGlobalConstraintsBinFile(globalInfo, globalConstraints, `${buildDir}/provingKey/pilout.globalConstraints.bin`);
+
+    await witnessLibraryGenerationAwait();
 }
