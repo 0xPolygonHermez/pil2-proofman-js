@@ -62,6 +62,51 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
         ops.push(opsIndex);
     }
 
+    const verifyRust = [];
+    if(verify) {
+        if(count1d > 0) {
+            verifyRust.push(`    let mut tmp_1 = vec![Goldilocks::ZERO; ${count1d}];`);
+        }
+        if(count3d > 0) {
+            verifyRust.push(`    let mut tmp_3 = vec![CubicExtensionField { value: [Goldilocks::ZERO, Goldilocks::ZERO, Goldilocks::ZERO] }; ${count3d}];`);
+        }
+        for (let j = 0; j < code_.length; j++) {
+            let line = "";
+            const r = code_[j];
+            if(r.op === "copy") {
+                line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[0])};`;
+            } else {
+                if (r.op === "mul") {
+                    if (r.src[0].dim === 1 && r.src[1].dim === 3) {
+                        line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[1])} * ${getOperationVerify(r.src[0])};`;
+                    } else {
+                        line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[0])} * ${getOperationVerify(r.src[1])};`;
+                    }
+                } else if (r.op === "add") {
+                    if (r.src[0].dim === 1 && r.src[1].dim === 3) {
+                        line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[1])} + ${getOperationVerify(r.src[0])};`;
+                    } else {
+                        line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[0])} + ${getOperationVerify(r.src[1])};`;
+                    }
+                } else {
+                    assert(r.op === "sub");
+                    if (r.src[0].dim === 1 && r.src[1].dim === 3) {
+                        line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[1])}.sub_from_scalar(${getOperationVerify(r.src[0])});`;
+                    } else {
+                        line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[0])} - ${getOperationVerify(r.src[1])};`;
+                    }
+                }
+            }
+            verifyRust.push(line);
+        }
+        const destTmp = code_[code_.length - 1].dest;
+        if(destTmp.dim == 1) {
+            verifyRust.push(`    return tmp_1[${ID1D[destTmp.id]}];`);
+        } else if(destTmp.dim == 3) {
+            verifyRust.push(`    return tmp_3[${ID3D[destTmp.id]}];`);
+        } else throw new Error("Unknown destination dimension");
+    }
+
    
 
     const expsInfo = {
@@ -80,7 +125,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
         expsInfo.destId = ID3D[destTmp.id];
     } else throw new Error("Unknown");
     
-    return {expsInfo};
+    return {expsInfo, verifyRust};
 
     function pushArgs(r, type, dest) {
         if(dest && !["tmp"].includes(r.type)) throw new Error("Invalid reference type set: " + r.type);
@@ -269,6 +314,72 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
             return `proofvalue${r.dim}`;
         } else {
             return r.type;
+        }
+    }
+
+    function getOperationVerify(r) {
+        switch (r.type) {
+            case "tmp": {
+                if (r.dim === 1) {
+                    return `tmp_1[${ID1D[r.id]}]`;
+                } else {
+                    assert(r.dim === 3);
+                    return `tmp_3[${ID3D[r.id]}]`;
+                }
+            }
+            case "const": {
+                return `vals[0][${r.id}]`;
+            }
+            case "cm": {
+                let val = starkInfo.cmPolsMap[r.id];
+                let stage = val.stage;
+                let stagePos = val.stagePos;
+                if (r.dim === 1) {
+                    return `vals[${stage}][${stagePos}]`;
+                } else {
+                    assert(r.dim === 3);
+                    return `CubicExtensionField { value: [vals[${stage}][${stagePos}], vals[${stage}][${stagePos + 1}], vals[${stage}][${stagePos + 2}]] }`;
+                }
+            }
+            case "custom": {
+                return `vals[${starkInfo.nStages + 1 + r.commitId}][${r.id}]`;
+            }
+            case "public": {
+                return `publics[${r.id}]`;
+            }
+            case "eval": {
+                return `evals[${r.id}]`;
+            }
+            case "challenge": {
+                return `challenges[${r.id}]`;
+            }
+            case "number": {
+                let num = BigInt(r.value);
+                if(num < 0n) num += BigInt(0xFFFFFFFF00000001n);
+                let numString = `Goldilocks::new(${num.toString()})`;
+                return numString;
+            }
+            case "airvalue": {
+                return `air_values[${r.id}]`;
+            }
+            case "proofvalue": {
+                return `proof_values[${r.id}]`;
+            }
+            case "airgroupvalue": {
+                return `airgroup_values[${r.id}]`;
+            }
+            case "Zi": {
+                return `zi[${r.boundaryId}]`;
+            }
+            case "xDivXSubXi": {
+                return `xdivxsub[${r.id}]`;
+            }
+            case "x": {
+                return "xi_challenge";
+            }
+            default: {
+                throw new Error("Invalid type for verify: " + r.type);
+            }
         }
     }
 

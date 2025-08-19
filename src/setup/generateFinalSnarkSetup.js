@@ -93,14 +93,12 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     await exec(`${setupOptions.constTree} -c ${filesDir}/${template}.const -s ${filesDir}/${template}.starkinfo.json -v ${filesDir}/${template}.verkey.json`);
     setupRecursiveF.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/${template}.verkey.json`, "utf8"));
     
-    // await writeExpressionsBinFile(`${filesDir}/${template}.bin`, setupRecursiveF.starkInfo, setupRecursiveF.expressionsInfo);
     const { stdout: stdout2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.expressionsinfo.json -b ${filesDir}/${template}.bin`);
     console.log(stdout2);
 
-    // await writeVerifierExpressionsBinFile(`${filesDir}/${template}.verifier.bin`, setupRecursiveF.starkInfo, setupRecursiveF.verifierInfo);
     const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.verifierinfo.json -b ${filesDir}/${template}.verifier.bin --verifier`);
     console.log(stdout3);
-
+    
     template = "final";
     verifierName = "recursivef.verifier.circom";
     templateFilename = path.resolve(__dirname,"../../", `node_modules/stark-recurser/src/recursion/templates/final.circom.ejs`);

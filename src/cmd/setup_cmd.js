@@ -11,6 +11,7 @@ const { AirOut } = require("../airout.js");
 const { writeGlobalConstraintsBinFile } = require("../pil2-stark/chelpers/globalConstraintsBinFile.js");
 const { starkSetup } = require('../pil2-stark/stark_setup.js');
 const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
+const { writeVerifierRustFile } = require("../pil2-stark/chelpers/binFile.js");
 
 const { genFinalSetup } = require("../setup/generateFinalSetup.js");
 const { genRecursiveSetup } = require("../setup/generateRecursiveSetup.js");
@@ -99,6 +100,8 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
 
             const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -e ${path.join(filesDir, `${air.name}.verifierinfo.json`)} -b ${path.join(filesDir, `${air.name}.verifier.bin`)} --verifier`);
             console.log(stdout3);
+
+            writeVerifierRustFile(`${filesDir}/${air.name}.verifier.rs`, setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].verifierInfo, setup[airgroup.airgroupId][air.airId].constRoot);
         }));
     }));
 

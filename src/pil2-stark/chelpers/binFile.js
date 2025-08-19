@@ -1,3 +1,4 @@
+const fs = require('fs');
 const { createBinFile,
     endWriteSection,
     startWriteSection
@@ -35,6 +36,14 @@ module.exports.writeVerifierExpressionsBinFile = async function writeVerifierExp
     console.log("---------------------------------------------");
 
     await cHelpersBin.close();
+}
+
+module.exports.writeVerifierRustFile = async function writeVerifierRustFile(verifierFilename, starkInfo, verifierInfo, verkeyRoot) {
+    console.log("> Writing the chelpers verifier file");
+        
+    const rustVerifier = await prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot);
+
+    await fs.promises.writeFile(verifierFilename, rustVerifier, "utf8");        
 }
 
 module.exports.writeExpressionsBinFile = async function writeExpressionsBinFile(cHelpersFilename, starkInfo, expressionsInfo) {
@@ -383,6 +392,80 @@ async function prepareVerifierExpressionsBin(starkInfo, verifierInfo) {
     if (queryCode.nTemp3 > maxTmp3) maxTmp3 = queryCode.nTemp3;
     if (queryCode.args.length > maxArgs) maxArgs = queryCode.args.length;
     if (queryCode.ops.length > maxOps) maxOps = queryCode.ops.length;
-   
+
     return {qCode, queryCode, numbersExps, maxTmp1, maxTmp3, maxArgs, maxOps};
+}
+
+
+async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
+    
+    let operations = [
+        { dest_type: "dim1", src0_type: "dim1", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim3"},
+    ];
+
+
+ 
+    let {verifyRust: verifyQRust} = getParserArgs(starkInfo, operations, verifierInfo.qVerifier, [], false, true, true);
+    let {verifyRust: verifyFRIRust} = getParserArgs(starkInfo, operations, verifierInfo.queryVerifier, [], false, true);
+ 
+    let verifierRust = [];
+    verifierRust.push("use fields::{Goldilocks, CubicExtensionField, Field};");
+    verifierRust.push("use proofman_common::Boundary;");
+    verifierRust.push("use proofman::{VerifierInfo, stark_verify};\n");
+    verifyQRust.unshift("pub fn q_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], publics: &[Goldilocks], zi: &[CubicExtensionField<Goldilocks>], xi_challenge: CubicExtensionField<Goldilocks>) -> CubicExtensionField<Goldilocks> {");
+    verifyQRust.unshift("#[rustfmt::skip]")
+    verifyQRust.push("}");
+    verifierRust.push(...verifyQRust);
+    verifierRust.push("\n");
+    verifyFRIRust.unshift("pub fn query_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], vals: &[Vec<Goldilocks>], xdivxsub: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
+    verifyFRIRust.unshift("#[rustfmt::skip]")
+    verifyFRIRust.push("}\n");
+    verifierRust.push(...verifyFRIRust);
+    let verify = [];
+    verify.push("#[rustfmt::skip]")
+    verify.push("pub fn verify(proof: &[u64]) -> bool {");
+    verify.push("    let verifier_info = VerifierInfo {");
+    verify.push("       root_c: [" + verkeyRoot.map(v => `Goldilocks::new(${v})`).join(", ") + "],");
+    verify.push("        n_publics: " + starkInfo.nPublics + ",");
+    verify.push("        n_stages: " + starkInfo.nStages + ",");
+    verify.push("        n_constants: " + starkInfo.nConstants + ",");
+    verify.push("        n_evals: " + starkInfo.evMap.length + ",");
+    verify.push("        n_bits: " + starkInfo.starkStruct.nBits + ",");
+    verify.push("        n_bits_ext: " + starkInfo.starkStruct.nBitsExt + ",");
+    verify.push("        arity: " + starkInfo.starkStruct.merkleTreeArity + ",");
+    verify.push("        n_fri_queries: " + starkInfo.starkStruct.nQueries + ",");
+    verify.push("        n_fri_steps: " + starkInfo.starkStruct.steps.length + ",");
+    verify.push("        n_challenges: " + starkInfo.challengesMap.length + ",");
+    verify.push("        n_challenges_total: " + (starkInfo.challengesMap.length + starkInfo.starkStruct.steps.length + 1) + ",");
+    verify.push("        fri_steps: vec![" + starkInfo.starkStruct.steps.map(s => s.nBits).join(", ") + "],");
+    verify.push("        hash_commits: " + starkInfo.starkStruct.hashCommits + ",");
+    let num_vals = [];
+    for(let i = 0; i < starkInfo.nStages + 1; ++i) {
+        num_vals.push(starkInfo.mapSectionsN[`cm${i + 1}`]);
+    }
+    verify.push("        num_vals: vec![" + num_vals.join(", ") + "],");
+    verify.push("        opening_points: vec![" + starkInfo.openingPoints.map(p => p.toString()).join(", ") + "],");
+    let boundaries = [];
+    for(let i = 0; i < starkInfo.boundaries.length; ++i) {
+        const b = starkInfo.boundaries[i];
+        const name      = b.name      ?? "None";
+        const offsetMin = b.offsetMin ?? "None";
+        const offsetMax = b.offsetMax ?? "None";
+        boundaries.push(
+            `Boundary { name: "${name}".to_string(), offset_min: ${offsetMin}, offset_max: ${offsetMax} }`
+        );
+    }
+    verify.push("        boundaries: vec![" + boundaries.join(", ") + "],");
+    verify.push("        q_deg: " + starkInfo.qDeg + ",");
+    let qIndex = starkInfo.cmPolsMap.findIndex(p => p.stage === starkInfo.nStages + 1 && p.stageId === 0);
+    let qEvIndex = starkInfo.evMap.findIndex(ev => ev.type === "cm" && ev.id === qIndex);
+    verify.push("        q_index: " + qEvIndex + ",");
+    verify.push("    };");
+    verify.push("    stark_verify(proof, &verifier_info, q_verify, query_verify)")
+    verify.push("}\n");
+    verifierRust.push(...verify);
+    let rustVerifier = verifierRust.join("\n");
+    return rustVerifier;
 }

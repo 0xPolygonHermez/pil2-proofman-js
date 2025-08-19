@@ -10,7 +10,7 @@ const ffjavascript = require("ffjavascript");
 
 const path = require('path');
 const { runWitnessLibraryGeneration, witnessLibraryGenerationAwait } = require('./generateWitness');
-const { writeExpressionsBinFile, writeVerifierExpressionsBinFile } = require("../pil2-stark/chelpers/binFile.js");
+const { writeExpressionsBinFile, writeVerifierExpressionsBinFile, writeVerifierRustFile } = require("../pil2-stark/chelpers/binFile.js");
 const { starkSetup } = require('../pil2-stark/stark_setup');
 const { AirOut } = require('../airout.js');
 const { writeGlobalConstraintsBinFile } = require('../pil2-stark/chelpers/globalConstraintsBinFile.js');
@@ -128,14 +128,13 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
     await exec(`${setupOptions.constTree} -c ${filesDir}/${template}.const -s ${filesDir}/${template}.starkinfo.json -v ${filesDir}/${template}.verkey.json`);
     setup.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/${template}.verkey.json`, "utf8"));
    
-    // await writeExpressionsBinFile(`${filesDir}/${template}.bin`, setup.starkInfo, setup.expressionsInfo);
     const { stdout: stdout2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.expressionsinfo.json -b ${filesDir}/${template}.bin`);
     console.log(stdout2);
 
-    // await writeVerifierExpressionsBinFile(`${filesDir}/${template}.verifier.bin`, setup.starkInfo, setup.verifierInfo);
     const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.verifierinfo.json -b ${filesDir}/${template}.verifier.bin --verifier`);
     console.log(stdout3);
     
+    writeVerifierRustFile(`${filesDir}/${template}.verifier.rs`, setup.starkInfo, setup.verifierInfo, setup.constRoot);
 
     if(template === "recursive2") {
         const vks = {

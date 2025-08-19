@@ -9,6 +9,7 @@ const { genCircom } = require('stark-recurser/src/gencircom.js');
 const { generateStarkStruct } = require("./utils");
 const path = require("path");
 const { runWitnessLibraryGeneration, witnessLibraryGenerationAwait } = require("./generateWitness");
+const { writeVerifierRustFile } = require("../pil2-stark/chelpers/binFile.js");
 
 const {starkSetup} = require("../pil2-stark/stark_setup");
 const { AirOut } = require('../airout.js');
@@ -117,13 +118,13 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
     const {stdout} = await exec(`${setupOptions.constTree} -c ${filesDir}/${nameFilename}.const -s ${filesDir}/${nameFilename}.starkinfo.json -v ${filesDir}/${nameFilename}.verkey.json`);
     setup.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/${nameFilename}.verkey.json`, "utf8"));
 
-    // await writeExpressionsBinFile(`${filesDir}/${nameFilename}.bin`, setup.starkInfo, setup.expressionsInfo);
     const { stdout: stdout2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${nameFilename}.starkinfo.json -e ${filesDir}/${nameFilename}.expressionsinfo.json -b ${filesDir}/${nameFilename}.bin`);
     console.log(stdout2);
 
-    // await writeVerifierExpressionsBinFile(`${filesDir}/${nameFilename}.verifier.bin`, setup.starkInfo, setup.verifierInfo);
     const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${nameFilename}.starkinfo.json -e ${filesDir}/${nameFilename}.verifierinfo.json -b ${filesDir}/${nameFilename}.verifier.bin --verifier`);
     console.log(stdout3);
+
+    writeVerifierRustFile(`${filesDir}/${nameFilename}.verifier.rs`, setup.starkInfo, setup.verifierInfo, setup.constRoot);
 
     return {starkInfoFinal: setup.starkInfo, verifierInfoFinal: setup.verifierInfo, constRootFinal: setup.constRoot, nBitsFinal: nBits};
 }
