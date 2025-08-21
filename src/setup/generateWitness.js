@@ -11,7 +11,6 @@ const rm = util.promisify(fs.rm);
 const pendingTasks = [];
 
 async function generateWitnessLibrary(buildDir,filesDir, nameFilename, template) {
-
     const randomString = crypto.randomBytes(16).toString('hex');
     const tmpDir = path.join(path.join(__dirname, "../../tmp"), `circom_temp_${randomString}`);
 
@@ -24,8 +23,20 @@ async function generateWitnessLibrary(buildDir,filesDir, nameFilename, template)
         
         console.log(`Generating witness library for ${nameFilename}...`);
         const fileExtension = process.platform === 'darwin' ? 'dylib' : 'so';
-        const execCommand = `make -C ${tmpDir} -j witness WITNESS_DIR=${path.resolve(filesDir)} WITNESS_FILE=${template}.${fileExtension} FINAL_VADCOP=true`;
-        await exec(execCommand);
+        const args = [
+            '-C', tmpDir,
+            '-j',
+            'witness',
+            `WITNESS_DIR=${path.resolve(filesDir)}`,
+            `WITNESS_FILE=${template}.${fileExtension}`,
+            'FINAL_VADCOP=true'
+        ];
+        await new Promise((resolve, reject) => {
+            const out = fs.openSync(path.join(filesDir, 'build.log'), 'a');
+            const err = fs.openSync(path.join(filesDir, 'build.err'), 'a');
+            const proc = spawn('make', args, { stdio: ['ignore', out, err] });
+            proc.on('close', code => code === 0 ? resolve() : reject(new Error(`make failed with code ${code}`)));
+        });
     } catch (err) {
         console.error("Error during the witness library generation process:", err);
     } finally {
@@ -51,7 +62,19 @@ async function generateWitnessFinalSnarkLibrary(buildDir, filesDir, template, na
             
             console.log(`Generating witness library for ${nameFilename}...`);
             const fileExtension = process.platform === 'darwin' ? 'dylib' : 'so';
-            await exec(`make -C ${tmpDir} -j witness WITNESS_DIR=${path.resolve(filesDir)} WITNESS_FILE=${template}.${fileExtension}`);
+            const args = [
+                '-C', tmpDir,
+                '-j',
+                'witness',
+                `WITNESS_DIR=${path.resolve(filesDir)}`,
+                `WITNESS_FILE=${template}.${fileExtension}`
+            ];
+            await new Promise((resolve, reject) => {
+                const out = fs.openSync(path.join(filesDir, 'build.log'), 'a');
+                const err = fs.openSync(path.join(filesDir, 'build.err'), 'a');
+                const proc = spawn('make', args, { stdio: ['ignore', out, err] });
+                proc.on('close', code => code === 0 ? resolve() : reject(new Error(`make failed with code ${code}`)));
+            });
         } catch (err) {
             console.error("Error during the witness library generation process:", err);
         } finally {
