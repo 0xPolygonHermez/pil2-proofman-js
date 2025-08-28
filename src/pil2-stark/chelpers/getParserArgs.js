@@ -345,7 +345,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 return `vals[${starkInfo.nStages + 1 + r.commitId}][${r.id}]`;
             }
             case "public": {
-                return `publics[${r.id}]`;
+                return `_publics[${r.id}]`;
             }
             case "eval": {
                 return `evals[${r.id}]`;

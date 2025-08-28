@@ -12,6 +12,7 @@ const argv = require("yargs")
     .alias("c", "circomPath")
     .alias("n", "circomName")
     .alias("t", "stdPath")
+    .alias("l", "nCols")
         .argv;
 
 async function run() {
@@ -24,6 +25,12 @@ async function run() {
 
     const circomPath = argv.circomPath;
     const circomName = argv.circomName;
+    
+    // Validate and set nCols
+    const nCols = argv.nCols || 36;
+    if (nCols !== 36 && nCols !== 42) {
+        throw new Error("nCols must be either 36 or 42");
+    }
 
     await fs.promises.mkdir(buildDir, { recursive: true });
 
@@ -43,7 +50,7 @@ async function run() {
         stdPath: argv.stdPath,
     };
 
-    await genRecursiveSetupTest(buildDir, setupOptions, starkStructRecursive, circomPath, circomName, 36);
+    await genRecursiveSetupTest(buildDir, setupOptions, starkStructRecursive, circomPath, circomName, nCols);
 
     console.log("files Generated Correctly");
 }
