@@ -66,10 +66,6 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
     
     runWitnessLibraryGeneration(buildDir, filesDir, nameFilename, nameFilename);
 
-    if(!setupOptions.powersOfTauFile) {
-        await witnessLibraryGenerationAwait();
-    }
-
     // Generate setup
     const finalR1csFile = `${buildDir}/build/${nameFilename}.r1cs`;
     const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await compressorSetup(finalR1csFile, compressorCols);
@@ -131,6 +127,10 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
     console.log(stdout3);
 
     writeVerifierRustFile(`${filesDir}/${nameFilename}.verifier.rs`, setup.starkInfo, setup.verifierInfo, setup.constRoot);
+
+    if(!setupOptions.powersOfTauFile) {
+        await witnessLibraryGenerationAwait();
+    }
 
     return {starkInfoFinal: setup.starkInfo, verifierInfoFinal: setup.verifierInfo, constRootFinal: setup.constRoot, nBitsFinal: nBits};
 }

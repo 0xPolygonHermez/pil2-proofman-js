@@ -34,8 +34,6 @@ async function run() {
 
     await fs.promises.mkdir(buildDir, { recursive: true });
 
-    let starkStructRecursive = generateStarkStruct({ blowupFactor: 3}, 17);
-
     if (!argv.stdPath) {
         throw new Error("Std path name must be provided");
     }
@@ -50,7 +48,7 @@ async function run() {
         stdPath: argv.stdPath,
     };
 
-    await genRecursiveSetupTest(buildDir, setupOptions, starkStructRecursive, circomPath, circomName, nCols);
+    await genRecursiveSetupTest(buildDir, setupOptions, circomPath, circomName, nCols);
 
     console.log("files Generated Correctly");
 }

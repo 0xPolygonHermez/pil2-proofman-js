@@ -14,7 +14,7 @@ const { writeExpressionsBinFile, writeVerifierExpressionsBinFile, writeVerifierR
 const { starkSetup } = require('../pil2-stark/stark_setup');
 const { AirOut } = require('../airout.js');
 const { writeGlobalConstraintsBinFile } = require('../pil2-stark/chelpers/globalConstraintsBinFile.js');
-const { setAiroutInfo } = require('./utils.js');
+const { setAiroutInfo, generateStarkStruct } = require('./utils.js');
 const compilePil2 = require("pil2-compiler/src/compiler.js");
 const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
 const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
@@ -154,7 +154,7 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
 
 }
 
-module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buildDir, setupOptions, starkStruct, circomPath, circomName, compressorCols) {
+module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buildDir, setupOptions, circomPath, circomName, compressorCols) {
 
     const nameFile = compressorCols == 36 ? "RecursiveC36" : "RecursiveC42";
     const filesDir = path.join(buildDir, "provingKey", "build", nameFile, "airs", nameFile, "air");
@@ -213,7 +213,9 @@ module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buil
 
     await fixedCols.saveToFile(`${filesDir}/${nameFile}.const`);
 
-    const setup = await starkSetup(air, starkStruct, {...setupOptions, airgroupId:0, airId:0});
+    let starkStructRecursive = generateStarkStruct({blowupFactor: 3}, Math.log2(air.numRows));
+
+    const setup = await starkSetup(air, starkStructRecursive, {...setupOptions, airgroupId:0, airId:0});
 
     await fs.promises.writeFile(`${filesDir}/${nameFile}.starkinfo.json`, JSON.stringify(setup.starkInfo, null, 1), "utf8");
 
