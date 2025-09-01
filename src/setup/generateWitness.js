@@ -4,6 +4,7 @@ const exec = util.promisify(require('child_process').exec);
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { spawn } = require('child_process');
 
 const mkdir = util.promisify(fs.mkdir);
 const rm = util.promisify(fs.rm);
