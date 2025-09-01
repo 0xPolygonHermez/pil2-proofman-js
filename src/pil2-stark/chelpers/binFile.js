@@ -463,8 +463,17 @@ async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
     verify.push("        q_index: " + qEvIndex + ",");
     verify.push("    }");
     verify.push("}\n");
-    verify.push("pub fn verify(proof: &[u64], vk: &[u64]) -> bool {");
-    verify.push("    stark_verify(proof, vk, &verifier_info(), q_verify, query_verify)");
+    verify.push("pub fn verify(proof: &[u8], vk: &[u8]) -> bool {");
+    verify.push("let mut buf = Vec::new();");
+    verify.push("let proof_data: &[u8] = if proof.len() >= 4 && proof[0..4] == [0x28, 0xB5, 0x2F, 0xFD] {");
+    verify.push("    let cursor = std::io::Cursor::new(proof);");
+    verify.push(`    let mut decoder = zstd::stream::read::Decoder::new(cursor).expect("Invalid zstd stream");`);
+    verify.push(`    std::io::Read::read_to_end(&mut decoder, &mut buf).expect("Failed to decompress zstd file");`);
+    verify.push("    &buf");
+    verify.push("} else {");
+    verify.push("    proof");
+    verify.push("};");
+    verify.push("    stark_verify(proof_data, vk, &verifier_info(), q_verify, query_verify)");
     verify.push("}\n");
 
     verifierRust.push(...verify);
