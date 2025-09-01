@@ -66,10 +66,6 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
     
     runWitnessLibraryGeneration(buildDir, filesDir, nameFilename, nameFilename);
 
-    if(!setupOptions.powersOfTauFile) {
-        await witnessLibraryGenerationAwait();
-    }
-
     // Generate setup
     const finalR1csFile = `${buildDir}/build/${nameFilename}.r1cs`;
     const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await compressorSetup(finalR1csFile, compressorCols);
@@ -118,6 +114,12 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
     const {stdout} = await exec(`${setupOptions.constTree} -c ${filesDir}/${nameFilename}.const -s ${filesDir}/${nameFilename}.starkinfo.json -v ${filesDir}/${nameFilename}.verkey.json`);
     setup.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/${nameFilename}.verkey.json`, "utf8"));
 
+    const constRootBuffer = Buffer.alloc(32);
+    for (let i = 0; i < 4; i++) {
+        constRootBuffer.writeBigUInt64LE(setup.constRoot[i], i * 8);
+    }
+    await fs.promises.writeFile(`${filesDir}/${nameFilename}.verkey.bin`, constRootBuffer);
+
     const { stdout: stdout2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${nameFilename}.starkinfo.json -e ${filesDir}/${nameFilename}.expressionsinfo.json -b ${filesDir}/${nameFilename}.bin`);
     console.log(stdout2);
 
@@ -125,6 +127,10 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
     console.log(stdout3);
 
     writeVerifierRustFile(`${filesDir}/${nameFilename}.verifier.rs`, setup.starkInfo, setup.verifierInfo, setup.constRoot);
+
+    if(!setupOptions.powersOfTauFile) {
+        await witnessLibraryGenerationAwait();
+    }
 
     return {starkInfoFinal: setup.starkInfo, verifierInfoFinal: setup.verifierInfo, constRootFinal: setup.constRoot, nBitsFinal: nBits};
 }

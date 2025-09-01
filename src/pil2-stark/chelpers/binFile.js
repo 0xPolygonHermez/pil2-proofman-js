@@ -412,23 +412,22 @@ async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
  
     let verifierRust = [];
     verifierRust.push("use fields::{Goldilocks, CubicExtensionField, Field};");
-    verifierRust.push("use proofman_common::Boundary;");
-    verifierRust.push("use proofman::{VerifierInfo, stark_verify};\n");
-    verifyQRust.unshift("pub fn q_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], publics: &[Goldilocks], zi: &[CubicExtensionField<Goldilocks>], xi_challenge: CubicExtensionField<Goldilocks>) -> CubicExtensionField<Goldilocks> {");
-    verifyQRust.unshift("#[rustfmt::skip]")
+    verifierRust.push("use crate::{Boundary, VerifierInfo, stark_verify};\n");
+    verifyQRust.unshift("pub fn q_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], _publics: &[Goldilocks], zi: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
+    verifyQRust.unshift("#[allow(clippy::all)]");
+    verifyQRust.unshift("#[rustfmt::skip]");
     verifyQRust.push("}");
     verifierRust.push(...verifyQRust);
     verifierRust.push("\n");
     verifyFRIRust.unshift("pub fn query_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], vals: &[Vec<Goldilocks>], xdivxsub: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
+    verifyFRIRust.unshift("#[allow(clippy::all)]");
     verifyFRIRust.unshift("#[rustfmt::skip]")
     verifyFRIRust.push("}\n");
     verifierRust.push(...verifyFRIRust);
     let verify = [];
     verify.push("#[rustfmt::skip]")
-    verify.push("pub fn verify(proof: &[u64]) -> bool {");
-    verify.push("    let verifier_info = VerifierInfo {");
-    verify.push("       root_c: [" + verkeyRoot.map(v => `Goldilocks::new(${v})`).join(", ") + "],");
-    verify.push("        n_publics: " + starkInfo.nPublics + ",");
+    verify.push("pub fn verifier_info() -> VerifierInfo {");
+    verify.push("    VerifierInfo {");
     verify.push("        n_stages: " + starkInfo.nStages + ",");
     verify.push("        n_constants: " + starkInfo.nConstants + ",");
     verify.push("        n_evals: " + starkInfo.evMap.length + ",");
@@ -462,9 +461,21 @@ async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
     let qIndex = starkInfo.cmPolsMap.findIndex(p => p.stage === starkInfo.nStages + 1 && p.stageId === 0);
     let qEvIndex = starkInfo.evMap.findIndex(ev => ev.type === "cm" && ev.id === qIndex);
     verify.push("        q_index: " + qEvIndex + ",");
-    verify.push("    };");
-    verify.push("    stark_verify(proof, &verifier_info, q_verify, query_verify)")
+    verify.push("    }");
     verify.push("}\n");
+    verify.push("pub fn verify(proof: &[u8], vk: &[u8]) -> bool {");
+    verify.push("let mut buf = Vec::new();");
+    verify.push("let proof_data: &[u8] = if proof.len() >= 4 && proof[0..4] == [0x28, 0xB5, 0x2F, 0xFD] {");
+    verify.push("    let cursor = std::io::Cursor::new(proof);");
+    verify.push(`    let mut decoder = zstd::stream::read::Decoder::new(cursor).expect("Invalid zstd stream");`);
+    verify.push(`    std::io::Read::read_to_end(&mut decoder, &mut buf).expect("Failed to decompress zstd file");`);
+    verify.push("    &buf");
+    verify.push("} else {");
+    verify.push("    proof");
+    verify.push("};");
+    verify.push("    stark_verify(proof_data, vk, &verifier_info(), q_verify, query_verify)");
+    verify.push("}\n");
+
     verifierRust.push(...verify);
     let rustVerifier = verifierRust.join("\n");
     return rustVerifier;

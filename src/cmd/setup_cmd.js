@@ -94,6 +94,11 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             const { stdout } = await exec(`${setupOptions.constTree} -c ${path.join(filesDir, `${air.name}.const`)} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -v ${path.join(filesDir, `${air.name}.verkey.json`)}`);
             console.log(stdout);
             setup[airgroup.airgroupId][air.airId].constRoot = JSONbig.parse(await fs.promises.readFile(path.join(filesDir, `${air.name}.verkey.json`), "utf8"));
+            const constRootBuffer = Buffer.alloc(32);
+            for (let i = 0; i < 4; i++) {
+                constRootBuffer.writeBigUInt64LE(setup[airgroup.airgroupId][air.airId].constRoot[i], i * 8);
+            }
+            await fs.promises.writeFile(`${filesDir}/${air.name}.verkey.bin`, constRootBuffer);
 
             const { stdout: stdout2 } = await exec(`${setupOptions.binFile} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -e ${path.join(filesDir, `${air.name}.expressionsinfo.json`)} -b ${path.join(filesDir, `${air.name}.bin`)}`);
             console.log(stdout2);
@@ -218,7 +223,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         // }
         };
   
-        let finalSettings = { blowupFactor: 3};
+        let finalSettings = { blowupFactor: 4, finalDegree: 10, foldingFactor: 5 };
         if(proofManagerConfig.setup && proofManagerConfig.setup.settings && proofManagerConfig.setup.settings.final) {
             finalSettings = proofManagerConfig.setup.settings.final;
         }
@@ -226,7 +231,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         const {starkInfoFinal,
             constRootFinal,
             verifierInfoFinal,
-        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 36);
+        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 42);
         
         if(proofManagerConfig.setup.genFinalSnarkSetup) {
             await genFinalSnarkSetup(

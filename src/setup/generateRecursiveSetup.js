@@ -14,7 +14,7 @@ const { writeExpressionsBinFile, writeVerifierExpressionsBinFile, writeVerifierR
 const { starkSetup } = require('../pil2-stark/stark_setup');
 const { AirOut } = require('../airout.js');
 const { writeGlobalConstraintsBinFile } = require('../pil2-stark/chelpers/globalConstraintsBinFile.js');
-const { setAiroutInfo } = require('./utils.js');
+const { setAiroutInfo, generateStarkStruct } = require('./utils.js');
 const compilePil2 = require("pil2-compiler/src/compiler.js");
 const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
 const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
@@ -127,6 +127,12 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
     console.log("Computing Constant Tree...");
     await exec(`${setupOptions.constTree} -c ${filesDir}/${template}.const -s ${filesDir}/${template}.starkinfo.json -v ${filesDir}/${template}.verkey.json`);
     setup.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/${template}.verkey.json`, "utf8"));
+    
+    const constRootBuffer = Buffer.alloc(32);
+    for (let i = 0; i < 4; i++) {
+        constRootBuffer.writeBigUInt64LE(setup.constRoot[i], i * 8);
+    }
+    await fs.promises.writeFile(`${filesDir}/${template}.verkey.bin`, constRootBuffer);
    
     const { stdout: stdout2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.expressionsinfo.json -b ${filesDir}/${template}.bin`);
     console.log(stdout2);
@@ -148,9 +154,10 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
 
 }
 
-module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buildDir, setupOptions, starkStruct, circomPath, circomName, compressorCols) {
+module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buildDir, setupOptions, circomPath, circomName, compressorCols) {
 
-    const filesDir = path.join(buildDir, "provingKey", "build", "RecursiveC36", "airs", `RecursiveC36`, "air");
+    const nameFile = compressorCols == 36 ? "RecursiveC36" : "RecursiveC42";
+    const filesDir = path.join(buildDir, "provingKey", "build", nameFile, "airs", nameFile, "air");
 
     await fs.promises.mkdir(`${buildDir}/circom/`, { recursive: true });
     await fs.promises.mkdir(`${buildDir}/build/`, { recursive: true });
@@ -169,25 +176,25 @@ module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buil
     await exec(compileRecursiveCommand);
 
     console.log("Copying circom files...");
-    fs.copyFile(`${buildDir}/build/${circomName}_cpp/${circomName}.dat`, `${filesDir}/RecursiveC36.dat`, (err) => { if(err) throw err; });
+    fs.copyFile(`${buildDir}/build/${circomName}_cpp/${circomName}.dat`, `${filesDir}/${nameFile}.dat`, (err) => { if(err) throw err; });
     
     // Generate witness library
-    runWitnessLibraryGeneration(buildDir, filesDir, circomName, "RecursiveC36");
+    runWitnessLibraryGeneration(buildDir, filesDir, circomName, nameFile);
 
     // Generate setup
     let recurserOptions = { };
     const {exec: execBuff, pilStr, fixedPols, airgroupName, airName, nBits } = await compressorSetup(`${buildDir}/build/${circomName}.r1cs`, compressorCols, recurserOptions);
 
-    await writeFixedPolsBin(`${buildDir}/build/RecursiveC36.bin`, airgroupName, airName, 1 << nBits, fixedPols);
+    await writeFixedPolsBin(`${buildDir}/build/${nameFile}.bin`, airgroupName, airName, 1 << nBits, fixedPols);
 
-    await fs.promises.writeFile(`${buildDir}/pil/RecursiveC36.pil`, pilStr, "utf8");
+    await fs.promises.writeFile(`${buildDir}/pil/${nameFile}.pil`, pilStr, "utf8");
     
-    let pilFile = `${buildDir}/build/RecursiveC36.pilout`;
+    let pilFile = `${buildDir}/build/${nameFile}.pilout`;
     let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath] };
     const F = new ffjavascript.F1Field((1n<<64n)-(1n<<32n)+1n );
-    compilePil2(F, `${buildDir}/pil/RecursiveC36.pil`, null, pilConfig);
+    compilePil2(F, `${buildDir}/pil/${nameFile}.pil`, null, pilConfig);
 
-    const fd =await fs.promises.open(`${filesDir}/RecursiveC36.exec`, "w+");
+    const fd =await fs.promises.open(`${filesDir}/${nameFile}.exec`, "w+");
     await fd.write(execBuff);
     await fd.close();
 
@@ -196,30 +203,38 @@ module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buil
     let air = airout.airGroups[0].airs[0];
 
     let fixedInfo = {};
-    await readFixedPolsBin(fixedInfo, `${buildDir}/build/RecursiveC36.bin`);
+    await readFixedPolsBin(fixedInfo, `${buildDir}/build/${nameFile}.bin`);
     const fixedCols = generateFixedCols(air.symbols.filter(s => s.airGroupId == 0), air.numRows);
     await getFixedPolsPil2(airout.airGroups[0].name, air, fixedCols, fixedInfo);
 
     airout.name = "build";
-    airout.airGroups[0].name = "RecursiveC36";
-    air.name = "RecursiveC36";
+    airout.airGroups[0].name = nameFile;
+    air.name = nameFile;
 
-    await fixedCols.saveToFile(`${filesDir}/RecursiveC36.const`);
+    await fixedCols.saveToFile(`${filesDir}/${nameFile}.const`);
 
-    const setup = await starkSetup(air, starkStruct, {...setupOptions, airgroupId:0, airId:0});
+    let starkStructRecursive = generateStarkStruct({blowupFactor: 3}, Math.log2(air.numRows));
 
-    await fs.promises.writeFile(`${filesDir}/RecursiveC36.starkinfo.json`, JSON.stringify(setup.starkInfo, null, 1), "utf8");
+    const setup = await starkSetup(air, starkStructRecursive, {...setupOptions, airgroupId:0, airId:0});
 
-    await fs.promises.writeFile(`${filesDir}/RecursiveC36.verifierinfo.json`, JSON.stringify(setup.verifierInfo, null, 1), "utf8");
+    await fs.promises.writeFile(`${filesDir}/${nameFile}.starkinfo.json`, JSON.stringify(setup.starkInfo, null, 1), "utf8");
 
-    await fs.promises.writeFile(`${filesDir}/RecursiveC36.expressionsinfo.json`, JSON.stringify(setup.expressionsInfo, null, 1), "utf8");
+    await fs.promises.writeFile(`${filesDir}/${nameFile}.verifierinfo.json`, JSON.stringify(setup.verifierInfo, null, 1), "utf8");
+
+    await fs.promises.writeFile(`${filesDir}/${nameFile}.expressionsinfo.json`, JSON.stringify(setup.expressionsInfo, null, 1), "utf8");
 
     console.log("Computing Constant Tree...");
-    await exec(`${setupOptions.constTree} -c ${filesDir}/RecursiveC36.const -s ${filesDir}/RecursiveC36.starkinfo.json -v ${filesDir}/RecursiveC36.verkey.json`);
-    setup.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/RecursiveC36.verkey.json`, "utf8"));
+    await exec(`${setupOptions.constTree} -c ${filesDir}/${nameFile}.const -s ${filesDir}/${nameFile}.starkinfo.json -v ${filesDir}/${nameFile}.verkey.json`);
+    setup.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/${nameFile}.verkey.json`, "utf8"));
 
-    await writeExpressionsBinFile(`${filesDir}/RecursiveC36.bin`, setup.starkInfo, setup.expressionsInfo);
-    await writeVerifierExpressionsBinFile(`${filesDir}/RecursiveC36.verifier.bin`, setup.starkInfo, setup.verifierInfo);
+    const constRootBuffer = Buffer.alloc(32);
+    for (let i = 0; i < 4; i++) {
+        constRootBuffer.writeBigUInt64LE(setup.constRoot[i], i * 8);
+    }
+    await fs.promises.writeFile(`${filesDir}/${nameFile}.verkey.bin`, constRootBuffer);
+
+    await writeExpressionsBinFile(`${filesDir}/${nameFile}.bin`, setup.starkInfo, setup.expressionsInfo);
+    await writeVerifierExpressionsBinFile(`${filesDir}/${nameFile}.verifier.bin`, setup.starkInfo, setup.verifierInfo);
 
     let globalInfo;
     let globalConstraints;
