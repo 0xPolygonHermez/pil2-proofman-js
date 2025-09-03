@@ -2,7 +2,6 @@
 #define CMUL_GOLDILOCKS
 
 #include "goldilocks_base_field.hpp"
-#include <immintrin.h>
 
 void CMul(uint64_t* out, uint *size_out, uint64_t *ina, uint* size_ina, uint64_t *inb, uint *size_inb)
 {

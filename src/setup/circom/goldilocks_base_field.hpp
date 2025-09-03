@@ -6,7 +6,9 @@
 #include <gmpxx.h>
 #include <iostream> // string
 #include <omp.h>
+#ifdef __AVX2__
 #include <immintrin.h>
+#endif
 #include <cassert>
 
 #define GOLDILOCKS_DEBUG 0
@@ -17,9 +19,6 @@
 #define GOLDILOCKS_PRIME 0xFFFFFFFF00000001ULL
 #define GOLDILOCKS_PRIME_NEG 0xFFFFFFFF
 #define MSB_ 0x8000000000000000 // Most Significant Bit
-
-#define AVX_SIZE_ 4
-#define AVX512_SIZE_ 8
 
 class Goldilocks
 {
@@ -159,6 +158,7 @@ public:
     /*
         AVX operations
     */
+#ifdef __AVX2__
     static void set_avx(__m256i &a, const Goldilocks::Element &a3, const Goldilocks::Element &a2, const Goldilocks::Element &a1, const Goldilocks::Element &a0);
 
     static void load_avx(__m256i &a_, const Goldilocks::Element *a4);
@@ -205,7 +205,7 @@ public:
     static void mmult_avx(__m256i &a0, __m256i &a1, __m256i &a2, const Element M[144]);
     static void mmult_avx_a(__m256i &a0, __m256i &a1, __m256i &a2, const Element M_a[144]);
     static void mmult_avx_8(__m256i &a0, __m256i &a1, __m256i &a2, const Element M_8[144]);
-
+#endif
 };
 
 /*

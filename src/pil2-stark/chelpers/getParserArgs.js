@@ -10,7 +10,6 @@ const operationsTypeMap = {
 
 const operationsMap = {
     "commit1": 0,
-    "x": 0,
     "Zi": 0,
     "const": 0,
     "custom1": 0,
@@ -31,37 +30,12 @@ const operationsMap = {
     "eval": 12,
 }
 
-const operationsMapParser = {
-    "commit1": 0,
-    "x": 0,
-    "Zi": 0,
-    "const": 0,
-    "custom1": 0,
-    "custom3": 0,
-    "commit3": 0,
-    "xDivXSubXi": 0,
-    "tmp1": 1,
-    "public": 2,
-    "number": 3,
-    "airvalue1": 4,
-    "airvalue3": 4,
-    "proofvalue1": 5,
-    "proofvalue": 5,
-    "proofvalue3": 5,
-    "tmp3": 6,
-    "airgroupvalue": 7,
-    "challenge": 8, 
-    "eval": 9,
-}
-
 module.exports.getParserArgs = function getParserArgs(starkInfo, operations, codeInfo, numbers = [], global = false, verify = false, globalInfo = {}) {
 
     var ops = [];
     var args = [];
 
     let code_ = codeInfo.code;
-
-    let symbolsUsed = codeInfo.symbolsUsed;
 
     const customCommits = !global ? starkInfo.customCommits : [];
 
@@ -75,8 +49,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
         const r = code_[j];
         
         let operation = getOperation(r, verify);
-
-        if(operation.op !== "copy") args.push(operationsTypeMap[operation.op]);
+        args.push(operationsTypeMap[operation.op]);
 
         pushArgs(r.dest, r.dest.type, true);
         for(let i = 0; i < operation.src.length; i++) {
@@ -89,6 +62,51 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
         ops.push(opsIndex);
     }
 
+    const verifyRust = [];
+    if(verify) {
+        if(count1d > 0) {
+            verifyRust.push(`    let mut tmp_1 = vec![Goldilocks::ZERO; ${count1d}];`);
+        }
+        if(count3d > 0) {
+            verifyRust.push(`    let mut tmp_3 = vec![CubicExtensionField { value: [Goldilocks::ZERO, Goldilocks::ZERO, Goldilocks::ZERO] }; ${count3d}];`);
+        }
+        for (let j = 0; j < code_.length; j++) {
+            let line = "";
+            const r = code_[j];
+            if(r.op === "copy") {
+                line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[0])};`;
+            } else {
+                if (r.op === "mul") {
+                    if (r.src[0].dim === 1 && r.src[1].dim === 3) {
+                        line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[1])} * ${getOperationVerify(r.src[0])};`;
+                    } else {
+                        line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[0])} * ${getOperationVerify(r.src[1])};`;
+                    }
+                } else if (r.op === "add") {
+                    if (r.src[0].dim === 1 && r.src[1].dim === 3) {
+                        line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[1])} + ${getOperationVerify(r.src[0])};`;
+                    } else {
+                        line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[0])} + ${getOperationVerify(r.src[1])};`;
+                    }
+                } else {
+                    assert(r.op === "sub");
+                    if (r.src[0].dim === 1 && r.src[1].dim === 3) {
+                        line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[1])}.sub_from_scalar(${getOperationVerify(r.src[0])});`;
+                    } else {
+                        line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[0])} - ${getOperationVerify(r.src[1])};`;
+                    }
+                }
+            }
+            verifyRust.push(line);
+        }
+        const destTmp = code_[code_.length - 1].dest;
+        if(destTmp.dim == 1) {
+            verifyRust.push(`    return tmp_1[${ID1D[destTmp.id]}];`);
+        } else if(destTmp.dim == 3) {
+            verifyRust.push(`    return tmp_3[${ID3D[destTmp.id]}];`);
+        } else throw new Error("Unknown destination dimension");
+    }
+
    
 
     const expsInfo = {
@@ -96,19 +114,6 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
         nTemp3: count3d,
         ops,
         args,
-    }
-
-    if(symbolsUsed) {
-        expsInfo.constPolsIds = symbolsUsed.filter(s => s.op === "const").map(s => s.id).sort();
-        expsInfo.cmPolsIds = symbolsUsed.filter(s => s.op === "cm").map(s => s.id).sort();
-        expsInfo.challengeIds = symbolsUsed.filter(s => s.op === "challenge").map(s => s.id).sort();
-        expsInfo.publicsIds = symbolsUsed.filter(s => s.op === "public").map(s => s.id).sort();
-        expsInfo.airgroupValuesIds = symbolsUsed.filter(s => s.op === "airgroupvalue").map(s => s.id).sort();
-        expsInfo.airValuesIds = symbolsUsed.filter(s => s.op === "airvalue").map(s => s.id).sort();
-        expsInfo.customValuesIds = [];
-        for(let i = 0; i < customCommits.length; ++i) {
-            expsInfo.customValuesIds.push(symbolsUsed.filter(s => s.op === "custom" && s.commitId === i).map(s => s.id).sort());
-        }
     }
 
     const destTmp = code_[code_.length - 1].dest;
@@ -120,7 +125,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
         expsInfo.destId = ID3D[destTmp.id];
     } else throw new Error("Unknown");
     
-    return {expsInfo};
+    return {expsInfo, verifyRust};
 
     function pushArgs(r, type, dest) {
         if(dest && !["tmp"].includes(r.type)) throw new Error("Invalid reference type set: " + r.type);
@@ -289,13 +294,6 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 args.push(0);
                 break;
             }
-            case "x": {
-                if(global) throw new Error("X should not appear in a global constraint");
-                args.push(starkInfo.nStages + 2);
-                args.push(0);
-                args.push(0);
-                break;
-            }
             default: 
                 throw new Error("Unknown type " + type);
         }
@@ -304,9 +302,9 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
     function getType(r, verify) {
         if(r.type === "cm") {
             return `commit${r.dim}`;
-        } else if(r.type === "const" || (r.type === "custom" && r.dim === 1) || ((r.type === "Zi" || r.type === "x") && !verify)) {
+        } else if(r.type === "const" || (r.type === "custom" && r.dim === 1) || ((r.type === "Zi") && !verify)) {
             return "commit1";
-        } else if(r.type === "xDivXSubXi" || (r.type === "custom" && r.dim === 3) || ((r.type === "Zi" || r.type === "x") && verify)) {
+        } else if(r.type === "xDivXSubXi" || (r.type === "custom" && r.dim === 3) || ((r.type === "Zi") && verify)) {
             return "commit3";
         } else if(r.type === "tmp") {
             return `tmp${r.dim}`;
@@ -316,6 +314,72 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
             return `proofvalue${r.dim}`;
         } else {
             return r.type;
+        }
+    }
+
+    function getOperationVerify(r) {
+        switch (r.type) {
+            case "tmp": {
+                if (r.dim === 1) {
+                    return `tmp_1[${ID1D[r.id]}]`;
+                } else {
+                    assert(r.dim === 3);
+                    return `tmp_3[${ID3D[r.id]}]`;
+                }
+            }
+            case "const": {
+                return `vals[0][${r.id}]`;
+            }
+            case "cm": {
+                let val = starkInfo.cmPolsMap[r.id];
+                let stage = val.stage;
+                let stagePos = val.stagePos;
+                if (r.dim === 1) {
+                    return `vals[${stage}][${stagePos}]`;
+                } else {
+                    assert(r.dim === 3);
+                    return `CubicExtensionField { value: [vals[${stage}][${stagePos}], vals[${stage}][${stagePos + 1}], vals[${stage}][${stagePos + 2}]] }`;
+                }
+            }
+            case "custom": {
+                return `vals[${starkInfo.nStages + 1 + r.commitId}][${r.id}]`;
+            }
+            case "public": {
+                return `_publics[${r.id}]`;
+            }
+            case "eval": {
+                return `evals[${r.id}]`;
+            }
+            case "challenge": {
+                return `challenges[${r.id}]`;
+            }
+            case "number": {
+                let num = BigInt(r.value);
+                if(num < 0n) num += BigInt(0xFFFFFFFF00000001n);
+                let numString = `Goldilocks::new(${num.toString()})`;
+                return numString;
+            }
+            case "airvalue": {
+                return `air_values[${r.id}]`;
+            }
+            case "proofvalue": {
+                return `proof_values[${r.id}]`;
+            }
+            case "airgroupvalue": {
+                return `airgroup_values[${r.id}]`;
+            }
+            case "Zi": {
+                return `zi[${r.boundaryId}]`;
+            }
+            case "xDivXSubXi": {
+                return `xdivxsub[${r.id}]`;
+            }
+            case "x": {
+                return "xi_challenge";
+            }
+            default: {
+                throw new Error("Invalid type for verify: " + r.type);
+            }
         }
     }
 
