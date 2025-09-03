@@ -1,15 +1,14 @@
+const fs = require('fs');
 const { createBinFile,
     endWriteSection,
     startWriteSection
      } = require("@iden3/binfileutils");
 const { getParserArgs } = require("./getParserArgs.js");
-const { getParserArgsPil1 } = require("./getParserArgsPil1.js");
-const { getAllOperations } = require("./utils.js");
 
-const CHELPERS_NSECTIONS = 4;
-const CHELPERS_EXPRESSIONS_SECTION = 2;
-const CHELPERS_CONSTRAINTS_DEBUG_SECTION = 3;
-const CHELPERS_HINTS_SECTION = 4;
+const CHELPERS_NSECTIONS = 3;
+const CHELPERS_EXPRESSIONS_SECTION = 1;
+const CHELPERS_CONSTRAINTS_DEBUG_SECTION = 2;
+const CHELPERS_HINTS_SECTION = 3;
 
 module.exports.writeStringToFile = async function writeStringToFile(fd, str) {
     let buff = new Uint8Array(str.length + 1);
@@ -29,14 +28,22 @@ module.exports.writeVerifierExpressionsBinFile = async function writeVerifierExp
     const verInfo = {};
     verInfo.expsInfo = [binFileInfo.qCode, binFileInfo.queryCode];
 
-    const cHelpersBin = await createBinFile(cHelpersFilename, "chps", 1, 2, 1 << 22, 1 << 24);
+    const cHelpersBin = await createBinFile(cHelpersFilename, "chps", 1, 1, 1 << 22, 1 << 24);
 
-    await writeExpressionsSection(cHelpersBin, verInfo.expsInfo, binFileInfo.numbersExps, binFileInfo.maxTmp1, binFileInfo.maxTmp3, binFileInfo.maxArgs, binFileInfo.maxOps, 2, true);
+    await writeExpressionsSection(cHelpersBin, verInfo.expsInfo, binFileInfo.numbersExps, binFileInfo.maxTmp1, binFileInfo.maxTmp3, binFileInfo.maxArgs, binFileInfo.maxOps, CHELPERS_EXPRESSIONS_SECTION);
 
     console.log("> Writing the chelpers file finished");
     console.log("---------------------------------------------");
 
     await cHelpersBin.close();
+}
+
+module.exports.writeVerifierRustFile = async function writeVerifierRustFile(verifierFilename, starkInfo, verifierInfo, verkeyRoot) {
+    console.log("> Writing the chelpers verifier file");
+        
+    const rustVerifier = await prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot);
+
+    await fs.promises.writeFile(verifierFilename, rustVerifier, "utf8");        
 }
 
 module.exports.writeExpressionsBinFile = async function writeExpressionsBinFile(cHelpersFilename, starkInfo, expressionsInfo) {
@@ -65,91 +72,28 @@ module.exports.writeExpressionsBinFile = async function writeExpressionsBinFile(
 async function writeExpressionsSection(cHelpersBin, expressionsInfo, numbersExps, maxTmp1, maxTmp3, maxArgs, maxOps, section) {
     console.log(`··· Writing Section ${section}. CHelpers expressions section`);
 
-    const nCustomCommits = expressionsInfo[0].customValuesIds.length;
-
     await startWriteSection(cHelpersBin, section);
 
     const opsExpressions = [];
     const argsExpressions = [];
-    const constPolsIdsExpressions = [];
-    const cmPolsIdsExpressions = [];
-    const challengesIdsExpressions = [];
-    const publicsIdsExpressions = [];
-    const airgroupValuesIdsExpressions = [];
-    const airValuesIdsExpressions = [];
-    const customCommitsIdsExpressions = [];
-
 
     const opsExpressionsOffset = [];
     const argsExpressionsOffset = [];
-    const constPolsIdsExpressionsOffset = [];
-    const cmPolsIdsExpressionsOffset = [];
-    const challengesIdsExpressionsOffset = [];
-    const publicsIdsExpressionsOffset = [];
-    const airgroupValuesIdsExpressionsOffset = [];
-    const airValuesIdsExpressionsOffset = [];
-    const customCommitsIdsExpressionsOffset = [];
-
+    
     for(let i = 0; i < expressionsInfo.length; i++) {
         if(i == 0) {
             opsExpressionsOffset.push(0);
             argsExpressionsOffset.push(0);
-            constPolsIdsExpressionsOffset.push(0);
-            cmPolsIdsExpressionsOffset.push(0);
-            challengesIdsExpressionsOffset.push(0);
-            publicsIdsExpressionsOffset.push(0);
-            airgroupValuesIdsExpressionsOffset.push(0);
-            airValuesIdsExpressionsOffset.push(0);
-            customCommitsIdsExpressionsOffset[0] = [];
-            for(let j = 0; j < nCustomCommits; ++j) {
-                customCommitsIdsExpressionsOffset[0].push(0);
-            }
         } else {
             opsExpressionsOffset.push(opsExpressionsOffset[i-1] + expressionsInfo[i-1].ops.length);
             argsExpressionsOffset.push(argsExpressionsOffset[i-1] + expressionsInfo[i-1].args.length);
-            constPolsIdsExpressionsOffset.push(constPolsIdsExpressionsOffset[i-1] + expressionsInfo[i-1].constPolsIds.length);
-            cmPolsIdsExpressionsOffset.push(cmPolsIdsExpressionsOffset[i-1] + expressionsInfo[i-1].cmPolsIds.length);
-            challengesIdsExpressionsOffset.push(challengesIdsExpressionsOffset[i-1] + expressionsInfo[i-1].challengeIds.length);
-            publicsIdsExpressionsOffset.push(publicsIdsExpressionsOffset[i-1] + expressionsInfo[i-1].publicsIds.length);
-            airgroupValuesIdsExpressionsOffset.push(airgroupValuesIdsExpressionsOffset[i-1] + expressionsInfo[i-1].airgroupValuesIds.length);
-            airValuesIdsExpressionsOffset.push(airValuesIdsExpressionsOffset[i-1] + expressionsInfo[i-1].airValuesIds.length);
-            customCommitsIdsExpressionsOffset[i] = [];
-            for(let j = 0; j < nCustomCommits; ++j) {
-                customCommitsIdsExpressionsOffset[i].push(customCommitsIdsExpressionsOffset[i-1][j] + expressionsInfo[i-1].customValuesIds[j].length);
-            }
-
         }
         for(let j = 0; j < expressionsInfo[i].ops.length; j++) {
             opsExpressions.push(expressionsInfo[i].ops[j]);
         }
         for(let j = 0; j < expressionsInfo[i].args.length; j++) {
             argsExpressions.push(expressionsInfo[i].args[j]);
-        }
-        for(let j = 0; j < expressionsInfo[i].constPolsIds.length; j++) {
-            constPolsIdsExpressions.push(expressionsInfo[i].constPolsIds[j]);
-        }
-        for(let j = 0; j < expressionsInfo[i].cmPolsIds.length; j++) {
-            cmPolsIdsExpressions.push(expressionsInfo[i].cmPolsIds[j]);
-        }
-        for(let j = 0; j < expressionsInfo[i].challengeIds.length; j++) {
-            challengesIdsExpressions.push(expressionsInfo[i].challengeIds[j]);
-        }
-        for(let j = 0; j < expressionsInfo[i].publicsIds.length; j++) {
-            publicsIdsExpressions.push(expressionsInfo[i].publicsIds[j]);
-        }
-        for(let j = 0; j < expressionsInfo[i].airgroupValuesIds.length; j++) {
-            airgroupValuesIdsExpressions.push(expressionsInfo[i].airgroupValuesIds[j]);
-        } 
-        for(let j = 0; j < expressionsInfo[i].airValuesIds.length; j++) {
-            airValuesIdsExpressions.push(expressionsInfo[i].airValuesIds[j]);
-        }
-
-        for(let j = 0; j < nCustomCommits; ++j) {
-            for(let k = 0; k < expressionsInfo[i].customValuesIds[j].length; k++) {
-                customCommitsIdsExpressions.push(expressionsInfo[i].customValuesIds[j][k]);
-            }
-        }
-         
+        }    
     }
     
     await cHelpersBin.writeULE32(maxTmp1);
@@ -160,17 +104,7 @@ async function writeExpressionsSection(cHelpersBin, expressionsInfo, numbersExps
     await cHelpersBin.writeULE32(argsExpressions.length);
     await cHelpersBin.writeULE32(numbersExps.length);
 
-    await cHelpersBin.writeULE32(constPolsIdsExpressions.length);
-    await cHelpersBin.writeULE32(cmPolsIdsExpressions.length);
-    await cHelpersBin.writeULE32(challengesIdsExpressions.length);
-    await cHelpersBin.writeULE32(publicsIdsExpressions.length);
-    await cHelpersBin.writeULE32(airgroupValuesIdsExpressions.length);
-    await cHelpersBin.writeULE32(airValuesIdsExpressions.length);
-    await cHelpersBin.writeULE32(customCommitsIdsExpressions.length);
-
     const nExpressions = expressionsInfo.length;
-
-    await cHelpersBin.writeULE32(nCustomCommits);
 
     //Write the number of expressions
     await cHelpersBin.writeULE32(nExpressions);
@@ -190,29 +124,6 @@ async function writeExpressionsSection(cHelpersBin, expressionsInfo, numbersExps
         await cHelpersBin.writeULE32(expInfo.args.length);
         await cHelpersBin.writeULE32(argsExpressionsOffset[i]);
         
-        await cHelpersBin.writeULE32(expInfo.constPolsIds.length);
-        await cHelpersBin.writeULE32(constPolsIdsExpressionsOffset[i]);
-
-        await cHelpersBin.writeULE32(expInfo.cmPolsIds.length);
-        await cHelpersBin.writeULE32(cmPolsIdsExpressionsOffset[i]);
-
-        await cHelpersBin.writeULE32(expInfo.challengeIds.length);
-        await cHelpersBin.writeULE32(challengesIdsExpressionsOffset[i]);
-
-        await cHelpersBin.writeULE32(expInfo.publicsIds.length);
-        await cHelpersBin.writeULE32(publicsIdsExpressionsOffset[i]);
-
-        await cHelpersBin.writeULE32(expInfo.airgroupValuesIds.length);
-        await cHelpersBin.writeULE32(airgroupValuesIdsExpressionsOffset[i]);
-
-        await cHelpersBin.writeULE32(expInfo.airValuesIds.length);
-        await cHelpersBin.writeULE32(airValuesIdsExpressionsOffset[i]);
-
-        for(let j = 0; j < nCustomCommits; ++j) {
-            await cHelpersBin.writeULE32(expInfo.customValuesIds[j].length);
-            await cHelpersBin.writeULE32(customCommitsIdsExpressionsOffset[i][j]);
-        }
-
         module.exports.writeStringToFile(cHelpersBin, expInfo.line);
     }
 
@@ -234,60 +145,9 @@ async function writeExpressionsSection(cHelpersBin, expressionsInfo, numbersExps
         buffNumbersExpressionsV.setBigUint64(8*j, BigInt(numbersExps[j]), true);
     }
 
-    const buffConstPolsIdsExpressions = new Uint8Array(2*constPolsIdsExpressions.length);
-    const buffConstPolsIdsExpressionsV = new DataView(buffConstPolsIdsExpressions.buffer);
-    for(let j = 0; j < constPolsIdsExpressions.length; j++) {
-        buffConstPolsIdsExpressionsV.setUint16(2*j, constPolsIdsExpressions[j], true);
-    }
-
-    const buffCmPolsIdsExpressions = new Uint8Array(2*cmPolsIdsExpressions.length);
-    const buffCmPolsIdsExpressionsV = new DataView(buffCmPolsIdsExpressions.buffer);
-    for(let j = 0; j < cmPolsIdsExpressions.length; j++) {
-        buffCmPolsIdsExpressionsV.setUint16(2*j, cmPolsIdsExpressions[j], true);
-    }
-
-    const buffChallengesIdsExpressions = new Uint8Array(2*challengesIdsExpressions.length);
-    const buffChallengesIdsExpressionsV = new DataView(buffChallengesIdsExpressions.buffer);
-    for(let j = 0; j < challengesIdsExpressions.length; j++) {
-        buffChallengesIdsExpressionsV.setUint16(2*j, challengesIdsExpressions[j], true);
-    }
-
-    const buffPublicsIdsExpressions = new Uint8Array(2*publicsIdsExpressions.length);
-    const buffPublicsIdsExpressionsV = new DataView(buffPublicsIdsExpressions.buffer);
-    for(let j = 0; j < publicsIdsExpressions.length; j++) {
-        buffPublicsIdsExpressionsV.setUint16(2*j, publicsIdsExpressions[j], true);
-    }
-
-    const buffAirgroupValuesIdsExpressions = new Uint8Array(2*airgroupValuesIdsExpressions.length);
-    const buffAirgroupValuesIdsExpressionsV = new DataView(buffAirgroupValuesIdsExpressions.buffer);
-    for(let j = 0; j < airgroupValuesIdsExpressions.length; j++) {
-        buffAirgroupValuesIdsExpressionsV.setUint16(2*j, airgroupValuesIdsExpressions[j], true);
-    }
-
-    const buffAirValuesIdsExpressions = new Uint8Array(2*airValuesIdsExpressions.length);
-    const buffAirValuesIdsExpressionsV = new DataView(buffAirValuesIdsExpressions.buffer);
-    for(let j = 0; j < airValuesIdsExpressions.length; j++) {
-        buffAirValuesIdsExpressionsV.setUint16(2*j, airValuesIdsExpressions[j], true);
-    }
-
-    const buffCustomCommitsIdsExpressions = new Uint8Array(2*customCommitsIdsExpressions.length);
-    const buffCustomCommitsIdsExpressionsV = new DataView(buffCustomCommitsIdsExpressions.buffer);
-    for(let j = 0; j < customCommitsIdsExpressions.length; j++) {
-        buffCustomCommitsIdsExpressionsV.setUint16(2*j, customCommitsIdsExpressions[j], true);
-    }
-    
     await cHelpersBin.write(buffOpsExpressions);
     await cHelpersBin.write(buffArgsExpressions);
     await cHelpersBin.write(buffNumbersExpressions);
-
-    await cHelpersBin.write(buffConstPolsIdsExpressions);
-    await cHelpersBin.write(buffCmPolsIdsExpressions);
-    await cHelpersBin.write(buffChallengesIdsExpressions);
-    await cHelpersBin.write(buffPublicsIdsExpressions);
-    await cHelpersBin.write(buffAirgroupValuesIdsExpressions);
-    await cHelpersBin.write(buffAirValuesIdsExpressions);
-    await cHelpersBin.write(buffCustomCommitsIdsExpressions);
-
 
     await endWriteSection(cHelpersBin);
 }
@@ -295,29 +155,13 @@ async function writeExpressionsSection(cHelpersBin, expressionsInfo, numbersExps
 async function writeConstraintsSection(cHelpersBin, constraintsInfo, numbersConstraints, section) {
     console.log(`··· Writing Section ${section}. CHelpers constraints debug section`);
 
-    const nCustomCommits = constraintsInfo[0].customValuesIds.length;
-
     await startWriteSection(cHelpersBin, section);
 
     const opsDebug = [];
     const argsDebug = [];
-    const constPolsIdsDebug = [];
-    const cmPolsIdsDebug = [];
-    const challengesIdsDebug = [];
-    const publicsIdsDebug = [];
-    const airgroupValuesIdsDebug = [];
-    const airValuesIdsDebug = [];
-    const customCommitsIdsDebug = [];
 
     const opsOffsetDebug = [];
     const argsOffsetDebug = [];
-    const constPolsIdsOffsetDebug = [];
-    const cmPolsIdsOffsetDebug = [];
-    const challengesIdsOffsetDebug = [];
-    const publicsIdsOffsetDebug = [];
-    const airgroupValuesIdsOffsetDebug = [];
-    const airValuesIdsOffsetDebug = [];
-    const customCommitsIdsOffsetDebug = [];
 
     const nConstraints = constraintsInfo.length;
 
@@ -325,29 +169,9 @@ async function writeConstraintsSection(cHelpersBin, constraintsInfo, numbersCons
         if(i == 0) {
             opsOffsetDebug.push(0);
             argsOffsetDebug.push(0);
-            constPolsIdsOffsetDebug.push(0);
-            cmPolsIdsOffsetDebug.push(0);
-            challengesIdsOffsetDebug.push(0);
-            publicsIdsOffsetDebug.push(0);
-            airgroupValuesIdsOffsetDebug.push(0);
-            airValuesIdsOffsetDebug.push(0);
-            customCommitsIdsOffsetDebug[0] = [];
-            for(let j = 0; j < nCustomCommits; ++j) {
-                customCommitsIdsOffsetDebug[0].push(0);
-            }
         } else {
             opsOffsetDebug.push(opsOffsetDebug[i-1] + constraintsInfo[i-1].ops.length);
             argsOffsetDebug.push(argsOffsetDebug[i-1] + constraintsInfo[i-1].args.length);
-            constPolsIdsOffsetDebug.push(constPolsIdsOffsetDebug[i-1] + constraintsInfo[i-1].constPolsIds.length);
-            cmPolsIdsOffsetDebug.push(cmPolsIdsOffsetDebug[i-1] + constraintsInfo[i-1].cmPolsIds.length);
-            challengesIdsOffsetDebug.push(challengesIdsOffsetDebug[i-1] + constraintsInfo[i-1].challengeIds.length);
-            publicsIdsOffsetDebug.push(publicsIdsOffsetDebug[i-1] + constraintsInfo[i-1].publicsIds.length);
-            airgroupValuesIdsOffsetDebug.push(airgroupValuesIdsOffsetDebug[i-1] + constraintsInfo[i-1].airgroupValuesIds.length);
-            airValuesIdsOffsetDebug.push(airValuesIdsOffsetDebug[i-1] + constraintsInfo[i-1].airValuesIds.length);
-            customCommitsIdsOffsetDebug[i] = [];
-            for(let j = 0; j < nCustomCommits; ++j) {
-                customCommitsIdsOffsetDebug[i].push(customCommitsIdsOffsetDebug[i-1][j] + constraintsInfo[i-1].customValuesIds[j].length);
-            }
         }
         for(let j = 0; j < constraintsInfo[i].ops.length; j++) {
             opsDebug.push(constraintsInfo[i].ops[j]);
@@ -355,45 +179,11 @@ async function writeConstraintsSection(cHelpersBin, constraintsInfo, numbersCons
         for(let j = 0; j < constraintsInfo[i].args.length; j++) {
             argsDebug.push(constraintsInfo[i].args[j]);
         }
-        for(let j = 0; j < constraintsInfo[i].constPolsIds.length; j++) {
-            constPolsIdsDebug.push(constraintsInfo[i].constPolsIds[j]);
-        }
-        for(let j = 0; j < constraintsInfo[i].cmPolsIds.length; j++) {
-            cmPolsIdsDebug.push(constraintsInfo[i].cmPolsIds[j]);
-        }
-        for(let j = 0; j < constraintsInfo[i].challengeIds.length; j++) {
-            challengesIdsDebug.push(constraintsInfo[i].challengeIds[j]);
-        }
-        for(let j = 0; j < constraintsInfo[i].publicsIds.length; j++) {
-            publicsIdsDebug.push(constraintsInfo[i].publicsIds[j]);
-        }
-        for(let j = 0; j < constraintsInfo[i].airgroupValuesIds.length; j++) {
-            airgroupValuesIdsDebug.push(constraintsInfo[i].airgroupValuesIds[j]);
-        }
-        for(let j = 0; j < constraintsInfo[i].airValuesIds.length; j++) {
-            airValuesIdsDebug.push(constraintsInfo[i].airValuesIds[j]);
-        }
-
-        for(let j = 0; j < nCustomCommits; ++j) {
-            for(let k = 0; k < constraintsInfo[i].customValuesIds[j].length; k++) {
-                customCommitsIdsDebug.push(constraintsInfo[i].customValuesIds[j][k]);
-            }
-        }
     }
 
     await cHelpersBin.writeULE32(opsDebug.length);
     await cHelpersBin.writeULE32(argsDebug.length);
     await cHelpersBin.writeULE32(numbersConstraints.length);
-
-    await cHelpersBin.writeULE32(constPolsIdsDebug.length);
-    await cHelpersBin.writeULE32(cmPolsIdsDebug.length);
-    await cHelpersBin.writeULE32(challengesIdsDebug.length);
-    await cHelpersBin.writeULE32(publicsIdsDebug.length);
-    await cHelpersBin.writeULE32(airgroupValuesIdsDebug.length);
-    await cHelpersBin.writeULE32(airValuesIdsDebug.length);
-    await cHelpersBin.writeULE32(customCommitsIdsDebug.length);
-
-    await cHelpersBin.writeULE32(nCustomCommits);
     
     await cHelpersBin.writeULE32(nConstraints);
 
@@ -416,29 +206,6 @@ async function writeConstraintsSection(cHelpersBin, constraintsInfo, numbersCons
         await cHelpersBin.writeULE32(constraintInfo.args.length);
         await cHelpersBin.writeULE32(argsOffsetDebug[i]);
         
-        await cHelpersBin.writeULE32(constraintInfo.constPolsIds.length);
-        await cHelpersBin.writeULE32(constPolsIdsOffsetDebug[i]);
-
-        await cHelpersBin.writeULE32(constraintInfo.cmPolsIds.length);
-        await cHelpersBin.writeULE32(cmPolsIdsOffsetDebug[i]);
-
-        await cHelpersBin.writeULE32(constraintInfo.challengeIds.length);
-        await cHelpersBin.writeULE32(challengesIdsOffsetDebug[i]);
-
-        await cHelpersBin.writeULE32(constraintInfo.publicsIds.length);
-        await cHelpersBin.writeULE32(publicsIdsOffsetDebug[i]);
-
-        await cHelpersBin.writeULE32(constraintInfo.airgroupValuesIds.length);
-        await cHelpersBin.writeULE32(airgroupValuesIdsOffsetDebug[i]);
-
-        await cHelpersBin.writeULE32(constraintInfo.airValuesIds.length);
-        await cHelpersBin.writeULE32(airValuesIdsOffsetDebug[i]);
-
-        for(let j = 0; j < nCustomCommits; ++j) {
-            await cHelpersBin.writeULE32(constraintInfo.customValuesIds[j].length);
-            await cHelpersBin.writeULE32(customCommitsIdsOffsetDebug[i][j]);
-        }
-
         await cHelpersBin.writeULE32(constraintInfo.imPol);
         module.exports.writeStringToFile(cHelpersBin, constraintInfo.line);
     }
@@ -460,60 +227,10 @@ async function writeConstraintsSection(cHelpersBin, constraintsInfo, numbersCons
     for(let j = 0; j < numbersConstraints.length; j++) {
         buffNumbersDebugV.setBigUint64(8*j, BigInt(numbersConstraints[j]), true);
     }
-
-    const buffConstPolsIdsDebug = new Uint8Array(2*constPolsIdsDebug.length);
-    const buffConstPolsIdsDebugV = new DataView(buffConstPolsIdsDebug.buffer);
-    for(let j = 0; j < constPolsIdsDebug.length; j++) {
-        buffConstPolsIdsDebugV.setUint16(2*j, constPolsIdsDebug[j], true);
-    }
-
-    const buffCmPolsIdsDebug = new Uint8Array(2*cmPolsIdsDebug.length);
-    const buffCmPolsIdsDebugV = new DataView(buffCmPolsIdsDebug.buffer);
-    for(let j = 0; j < cmPolsIdsDebug.length; j++) {
-        buffCmPolsIdsDebugV.setUint16(2*j, cmPolsIdsDebug[j], true);
-    }
-
-    const buffChallengesIdsDebug = new Uint8Array(2*challengesIdsDebug.length);
-    const buffChallengesIdsDebugV = new DataView(buffChallengesIdsDebug.buffer);
-    for(let j = 0; j < challengesIdsDebug.length; j++) {
-        buffChallengesIdsDebugV.setUint16(2*j, challengesIdsDebug[j], true);
-    }
-
-    const buffPublicsIdsDebug = new Uint8Array(2*publicsIdsDebug.length);
-    const buffPublicsIdsDebugV = new DataView(buffPublicsIdsDebug.buffer);
-    for(let j = 0; j < publicsIdsDebug.length; j++) {
-        buffPublicsIdsDebugV.setUint16(2*j, publicsIdsDebug[j], true);
-    }
-
-    const buffAirgroupValuesIdsDebug = new Uint8Array(2*airgroupValuesIdsDebug.length);
-    const buffAirgroupValuesIdsDebugV = new DataView(buffAirgroupValuesIdsDebug.buffer);
-    for(let j = 0; j < airgroupValuesIdsDebug.length; j++) {
-        buffAirgroupValuesIdsDebugV.setUint16(2*j, airgroupValuesIdsDebug[j], true);
-    }
-
-    const buffAirValuesIdsDebug = new Uint8Array(2*airValuesIdsDebug.length);
-    const buffAirValuesIdsDebugV = new DataView(buffAirValuesIdsDebug.buffer);
-    for(let j = 0; j < airValuesIdsDebug.length; j++) {
-        buffAirValuesIdsDebugV.setUint16(2*j, airValuesIdsDebug[j], true);
-    }
-
-    const buffCustomCommitsIdsDebug = new Uint8Array(2*customCommitsIdsDebug.length);
-    const buffCustomCommitsIdsDebugV = new DataView(buffCustomCommitsIdsDebug.buffer);
-    for(let j = 0; j < customCommitsIdsDebug.length; j++) {
-        buffCustomCommitsIdsDebugV.setUint16(2*j, customCommitsIdsDebug[j], true);
-    }
-    
+ 
     await cHelpersBin.write(buffOpsDebug);
     await cHelpersBin.write(buffArgsDebug);
     await cHelpersBin.write(buffNumbersDebug);
-
-    await cHelpersBin.write(buffConstPolsIdsDebug);
-    await cHelpersBin.write(buffCmPolsIdsDebug);
-    await cHelpersBin.write(buffChallengesIdsDebug);
-    await cHelpersBin.write(buffPublicsIdsDebug);
-    await cHelpersBin.write(buffAirgroupValuesIdsDebug);
-    await cHelpersBin.write(buffAirValuesIdsDebug);
-    await cHelpersBin.write(buffCustomCommitsIdsDebug);
 
     await endWriteSection(cHelpersBin);
 }
@@ -572,7 +289,11 @@ async function prepareExpressionsBin(starkInfo, expressionsInfo) {
     const numbersExps = [];
     const numbersConstraints = [];
 
-    let operations = getAllOperations();
+    let operations = [
+        { dest_type: "dim1", src0_type: "dim1", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim3"},
+    ];
 
     const N = 1 << (starkInfo.starkStruct.nBits);
 
@@ -603,9 +324,6 @@ async function prepareExpressionsBin(starkInfo, expressionsInfo) {
 
         const {expsInfo: constraintInfo} = getParserArgs(starkInfo, operations, constraintCode, numbersConstraints);
 
-        // const {expsInfo: constraintInfo} = starkInfo.pil2 
-        //     ? getParserArgs(starkInfo, operations, constraintCode, numbersConstraints)
-        //     : getParserArgsPil1(starkInfo, operations, constraintCode, numbersConstraints);
         constraintInfo.stage = constraintCode.stage;
         constraintInfo.firstRow = firstRow;
         constraintInfo.lastRow = lastRow;
@@ -636,7 +354,7 @@ async function prepareExpressionsBin(starkInfo, expressionsInfo) {
         if(expInfo.nTemp1 > maxTmp1) maxTmp1 = expInfo.nTemp1;
         if(expInfo.nTemp3 > maxTmp3) maxTmp3 = expInfo.nTemp3;
         if(expInfo.args.length > maxArgs) maxArgs = expInfo.args.length;
-        if(expInfo.ops.length > maxOps) maxOps = expInfo
+        if(expInfo.ops.length > maxOps) maxOps = expInfo.ops.length;
     }
     
     const res = {
@@ -648,7 +366,12 @@ async function prepareExpressionsBin(starkInfo, expressionsInfo) {
 
 async function prepareVerifierExpressionsBin(starkInfo, verifierInfo) {
     
-    let operations = getAllOperations();
+    let operations = [
+        { dest_type: "dim1", src0_type: "dim1", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim3"},
+    ];
+
 
     let maxTmp1 = 0;
     let maxTmp3 = 0;
@@ -669,6 +392,91 @@ async function prepareVerifierExpressionsBin(starkInfo, verifierInfo) {
     if (queryCode.nTemp3 > maxTmp3) maxTmp3 = queryCode.nTemp3;
     if (queryCode.args.length > maxArgs) maxArgs = queryCode.args.length;
     if (queryCode.ops.length > maxOps) maxOps = queryCode.ops.length;
-   
+
     return {qCode, queryCode, numbersExps, maxTmp1, maxTmp3, maxArgs, maxOps};
+}
+
+
+async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
+    
+    let operations = [
+        { dest_type: "dim1", src0_type: "dim1", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim1"}, 
+        { dest_type: "dim3", src0_type: "dim3", src1_type: "dim3"},
+    ];
+
+
+ 
+    let {verifyRust: verifyQRust} = getParserArgs(starkInfo, operations, verifierInfo.qVerifier, [], false, true, true);
+    let {verifyRust: verifyFRIRust} = getParserArgs(starkInfo, operations, verifierInfo.queryVerifier, [], false, true);
+ 
+    let verifierRust = [];
+    verifierRust.push("use fields::{Goldilocks, CubicExtensionField, Field};");
+    verifierRust.push("use crate::{Boundary, VerifierInfo, stark_verify};\n");
+    verifyQRust.unshift("pub fn q_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], _publics: &[Goldilocks], zi: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
+    verifyQRust.unshift("#[allow(clippy::all)]");
+    verifyQRust.unshift("#[rustfmt::skip]");
+    verifyQRust.push("}");
+    verifierRust.push(...verifyQRust);
+    verifierRust.push("\n");
+    verifyFRIRust.unshift("pub fn query_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], vals: &[Vec<Goldilocks>], xdivxsub: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
+    verifyFRIRust.unshift("#[allow(clippy::all)]");
+    verifyFRIRust.unshift("#[rustfmt::skip]")
+    verifyFRIRust.push("}\n");
+    verifierRust.push(...verifyFRIRust);
+    let verify = [];
+    verify.push("#[rustfmt::skip]")
+    verify.push("pub fn verifier_info() -> VerifierInfo {");
+    verify.push("    VerifierInfo {");
+    verify.push("        n_stages: " + starkInfo.nStages + ",");
+    verify.push("        n_constants: " + starkInfo.nConstants + ",");
+    verify.push("        n_evals: " + starkInfo.evMap.length + ",");
+    verify.push("        n_bits: " + starkInfo.starkStruct.nBits + ",");
+    verify.push("        n_bits_ext: " + starkInfo.starkStruct.nBitsExt + ",");
+    verify.push("        arity: " + starkInfo.starkStruct.merkleTreeArity + ",");
+    verify.push("        n_fri_queries: " + starkInfo.starkStruct.nQueries + ",");
+    verify.push("        n_fri_steps: " + starkInfo.starkStruct.steps.length + ",");
+    verify.push("        n_challenges: " + starkInfo.challengesMap.length + ",");
+    verify.push("        n_challenges_total: " + (starkInfo.challengesMap.length + starkInfo.starkStruct.steps.length + 1) + ",");
+    verify.push("        fri_steps: vec![" + starkInfo.starkStruct.steps.map(s => s.nBits).join(", ") + "],");
+    verify.push("        hash_commits: " + starkInfo.starkStruct.hashCommits + ",");
+    let num_vals = [];
+    for(let i = 0; i < starkInfo.nStages + 1; ++i) {
+        num_vals.push(starkInfo.mapSectionsN[`cm${i + 1}`]);
+    }
+    verify.push("        num_vals: vec![" + num_vals.join(", ") + "],");
+    verify.push("        opening_points: vec![" + starkInfo.openingPoints.map(p => p.toString()).join(", ") + "],");
+    let boundaries = [];
+    for(let i = 0; i < starkInfo.boundaries.length; ++i) {
+        const b = starkInfo.boundaries[i];
+        const name      = b.name      ?? "None";
+        const offsetMin = b.offsetMin ?? "None";
+        const offsetMax = b.offsetMax ?? "None";
+        boundaries.push(
+            `Boundary { name: "${name}".to_string(), offset_min: ${offsetMin}, offset_max: ${offsetMax} }`
+        );
+    }
+    verify.push("        boundaries: vec![" + boundaries.join(", ") + "],");
+    verify.push("        q_deg: " + starkInfo.qDeg + ",");
+    let qIndex = starkInfo.cmPolsMap.findIndex(p => p.stage === starkInfo.nStages + 1 && p.stageId === 0);
+    let qEvIndex = starkInfo.evMap.findIndex(ev => ev.type === "cm" && ev.id === qIndex);
+    verify.push("        q_index: " + qEvIndex + ",");
+    verify.push("    }");
+    verify.push("}\n");
+    verify.push("pub fn verify(proof: &[u8], vk: &[u8]) -> bool {");
+    verify.push("let mut buf = Vec::new();");
+    verify.push("let proof_data: &[u8] = if proof.len() >= 4 && proof[0..4] == [0x28, 0xB5, 0x2F, 0xFD] {");
+    verify.push("    let cursor = std::io::Cursor::new(proof);");
+    verify.push(`    let mut decoder = zstd::stream::read::Decoder::new(cursor).expect("Invalid zstd stream");`);
+    verify.push(`    std::io::Read::read_to_end(&mut decoder, &mut buf).expect("Failed to decompress zstd file");`);
+    verify.push("    &buf");
+    verify.push("} else {");
+    verify.push("    proof");
+    verify.push("};");
+    verify.push("    stark_verify(proof_data, vk, &verifier_info(), q_verify, query_verify)");
+    verify.push("}\n");
+
+    verifierRust.push(...verify);
+    let rustVerifier = verifierRust.join("\n");
+    return rustVerifier;
 }

@@ -2,7 +2,7 @@ const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const JSONbig = require('json-bigint')({ useNativeBigInt: true, alwaysParseAsBig: true });
 const fs = require('fs');
-const { compile } = require('pilcom');
+const ffjavascript = require("ffjavascript");
 
 const { compressorSetup } = require('stark-recurser/src/circom2pil/compressor_setup.js');
 const { genCircom } = require('stark-recurser/src/gencircom.js');
@@ -10,15 +10,16 @@ const pil2circom = require('stark-recurser/src/pil2circom/pil2circom.js');
 const path = require("path");
 const snarkjs = require("snarkjs");
 
-const F3g = require("../pil2-stark/utils/f3g.js");
 const {starkSetup} = require("../pil2-stark/stark_setup.js");
-const { writeExpressionsBinFile, writeVerifierExpressionsBinFile } = require("../pil2-stark/chelpers/binFile.js");
 const { generateStarkStruct } = require('./utils.js');
 const { runFinalSnarkWitnessLibraryGenerationAwait, witnessLibraryGenerationAwait, runWitnessLibraryGeneration } = require('./generateWitness.js');
+const { AirOut } = require('../airout.js');
+const compilePil2 = require("pil2-compiler/src/compiler.js");
+const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
+const { writeFixedPolsBin, readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
+
 
 module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, setupOptions, globalInfo, constRoot, verificationKeys = [], starkInfo, verifierInfo, compressorCols) {
-    const F = new F3g();
-
     let template = "recursivef";
     let verifierName = "vadcop_final.verifier.circom";
     let templateFilename = path.resolve(__dirname,"../../", `node_modules/stark-recurser/src/recursion/templates/recursivef.circom.ejs`);
@@ -40,7 +41,8 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
  
     // Compile circom
     console.log("Compiling " + template + "...");
-    const circomExecFile = path.resolve(__dirname, 'circom/circom');
+    const circomExecutable = process.platform === 'darwin' ? 'circom/circom_mac' : 'circom/circom';
+    const circomExecFile = path.resolve(__dirname, circomExecutable);
     const compileRecursiveCommand = `${circomExecFile} --O1 --r1cs --prime goldilocks --c --verbose -l ${starkRecurserCircuits} -l ${circuitsGLPath} ${buildDir}/circom/${template}.circom -o ${buildDir}/build`;
     await exec(compileRecursiveCommand);
  
@@ -51,23 +53,35 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     await runWitnessLibraryGeneration(buildDir, filesDir, template, template);
  
     // Generate setup
-    const {exec: execBuff, pilStr, constPols, nBits} = await compressorSetup(F, `${buildDir}/build/${template}.r1cs`, compressorCols);
- 
-    await constPols.saveToFile(`${filesDir}/${template}.const`);
+    const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await compressorSetup(`${buildDir}/build/${template}.r1cs`, compressorCols);
+    
+    await writeFixedPolsBin(`${buildDir}/build/${template}.fixed.bin`, airgroupName, airName, 1 << nBits, fixedPols);
+
+    const pilFilename = `${buildDir}/pil/${template}.pil`;
+    await fs.promises.writeFile(pilFilename, pilStr, "utf8");
+    
+    let pilFile = `${buildDir}/build/${template}.pilout`;
+    let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath] };
+    const F = new ffjavascript.F1Field((1n<<64n)-(1n<<32n)+1n );
+    compilePil2(F, pilFilename, null, pilConfig);
 
     const fd =await fs.promises.open(`${filesDir}/${template}.exec`, "w+");
     await fd.write(execBuff);
     await fd.close();
 
-    await fs.promises.writeFile(`${buildDir}/pil/${template}.pil`, pilStr, "utf8");
-
-    // Build stark info
-    const pilRecursive = await compile(F, `${buildDir}/pil/${template}.pil`);
-
     const starkStructSettings = { blowupFactor: 4, verificationHashType: "BN128", merkleTreeArity: 4, merkleTreeCustom: false };
     const starkStructRecursiveF = generateStarkStruct(starkStructSettings, nBits);
 
-    const setupRecursiveF = await starkSetup(pilRecursive, starkStructRecursiveF, {...setupOptions, F, pil2: false, recursion: true});
+    const airout = new AirOut(pilFile);
+    let air = airout.airGroups[0].airs[0];
+
+    let fixedInfo = {};
+    await readFixedPolsBin(fixedInfo, `${buildDir}/build/${template}.fixed.bin`);
+    const fixedCols = generateFixedCols(air.symbols.filter(s => s.airGroupId == 0), air.numRows);
+
+    await fixedCols.saveToFile(`${filesDir}/${template}.const`);
+    
+    const setupRecursiveF = await starkSetup(air, starkStructRecursiveF, {...setupOptions, airgroupId: 0, airId: 0});
 
     await fs.promises.writeFile(`${filesDir}/${template}.starkinfo.json`, JSON.stringify(setupRecursiveF.starkInfo, null, 1), "utf8");
 
@@ -79,9 +93,12 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     await exec(`${setupOptions.constTree} -c ${filesDir}/${template}.const -s ${filesDir}/${template}.starkinfo.json -v ${filesDir}/${template}.verkey.json`);
     setupRecursiveF.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/${template}.verkey.json`, "utf8"));
     
-    await writeExpressionsBinFile(`${filesDir}/${template}.bin`, setupRecursiveF.starkInfo, setupRecursiveF.expressionsInfo);
-    await writeVerifierExpressionsBinFile(`${filesDir}/${template}.verifier.bin`, setupRecursiveF.starkInfo, setupRecursiveF.verifierInfo);
+    const { stdout: stdout2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.expressionsinfo.json -b ${filesDir}/${template}.bin`);
+    console.log(stdout2);
 
+    const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.verifierinfo.json -b ${filesDir}/${template}.verifier.bin --verifier`);
+    console.log(stdout3);
+    
     template = "final";
     verifierName = "recursivef.verifier.circom";
     templateFilename = path.resolve(__dirname,"../../", `node_modules/stark-recurser/src/recursion/templates/final.circom.ejs`);

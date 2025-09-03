@@ -6,7 +6,6 @@ const log = require("../logger.js");
 const { generateStarkStruct, log2 } = require("./setup/utils.js");
 const path = require("path");
 const {starkSetup} = require("./pil2-stark/stark_setup.js");
-const F3g = require("./pil2-stark/utils/f3g.js");
 
 const argv = require("yargs")
     .version(version)
@@ -14,6 +13,7 @@ const argv = require("yargs")
     .alias("a", "airout")
     .alias("o", "output")
     .alias("g", "airgroups").array("g")
+    .alias("s", "starkstructs")
     .alias("i", "airs").array("i")
     .alias("m", "impols")
         .argv;
@@ -25,8 +25,6 @@ async function run() {
     await fs.promises.mkdir( path.dirname(statsFile), { recursive: true });
 
     const setupOptions = {
-        F: new F3g("0xFFFFFFFF00000001"),
-        pil2: true,
         optImPols: argv.impols || false,
     };
 
@@ -34,6 +32,8 @@ async function run() {
 
     const airgroups = argv.airgroups || [];
     const airs = argv.airs || [];
+
+    let starkStructsInfo = argv.starkstructs ? JSON.parse(await fs.promises.readFile(argv.starkstructs, "utf8")) : {};
 
     const stats = {};
     let statsFileInfo = [];
@@ -49,7 +49,11 @@ async function run() {
                 log.info("[Stats Cmd]", `··· Skipping air '${air.name}'`);
                 continue;
             }
-            let starkStruct = generateStarkStruct({}, log2(air.numRows));
+            let settings = {};
+            if (starkStructsInfo[airgroup.name] && starkStructsInfo[airgroup.name][air.name]) {
+                settings = starkStructsInfo[airgroup.name][air.name];
+            }
+            let starkStruct = generateStarkStruct(settings, log2(air.numRows));
             log.info("[Stats  Cmd]", `··· Computing stats for air '${air.name}'`);
             const setup = await starkSetup(air, starkStruct, setupOptions);
             statsFileInfo.push(`Airgroup: ${airgroup.name} Air: ${air.name}`);

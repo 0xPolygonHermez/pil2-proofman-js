@@ -1,3 +1,4 @@
+const { addInfoExpressionsSymbols } = require("../helpers");
 const { pilCodeGen, buildCode } = require("./codegen");
 
 
@@ -10,7 +11,6 @@ module.exports.generateExpressionsCode = function generateExpressionsCode(res, s
         const ctx = {
             stage: exp.stage,
             calculated: {},
-            symbolsUsed: [],
             tmpUsed: 0,
             code: [],
             dom,
@@ -36,16 +36,6 @@ module.exports.generateExpressionsCode = function generateExpressionsCode(res, s
             exprDest = { op: "cm", stage: symbolDest.stage, stageId: symbolDest.stageId, id: symbolDest.polId};
         }
 
-        if(exp.symbols) {
-            for(let k = 0; k < exp.symbols.length; k++) {
-                const symbolUsed = exp.symbols[k];
-                if(!ctx.symbolsUsed.find(s => s.op === symbolUsed.op && s.stage === symbolUsed.stage && s.id === symbolUsed.id)) {
-                    ctx.symbolsUsed.push(symbolUsed);
-                };
-            }
-        }
-         
-
         pilCodeGen(ctx, symbols, expressions, j, 0);
         const expInfo = buildCode(ctx);
         
@@ -58,7 +48,7 @@ module.exports.generateExpressionsCode = function generateExpressionsCode(res, s
         }
 
         expInfo.expId = j;
-        expInfo.stage = exp.stage;
+        expInfo.stage = exp.stage || 0;
         expInfo.dest = exprDest;
         expInfo.line = exp.line || "";       
 
@@ -74,21 +64,12 @@ module.exports.generateConstraintsDebugCode = function generateConstraintsDebugC
         const ctx = {
             stage: constraints[j].stage,
             calculated: {},
-            symbolsUsed: [],
             tmpUsed: 0,
             code: [],
             dom: "n",
             airId: res.airId,
             airgroupId: res.airgroupId,
-        };
-
-        const e = expressions[constraints[j].e];
-        for(let k = 0; k < e.symbols.length; k++) {
-            const symbolUsed = e.symbols[k];
-            if(!ctx.symbolsUsed.find(s => s.op === symbolUsed.op && s.stage === symbolUsed.stage && s.id === symbolUsed.id)) {
-                ctx.symbolsUsed.push(symbolUsed);
-            };
-        }
+        };    
 
         pilCodeGen(ctx, symbols, expressions, constraints[j].e, 0);
         const constraint = buildCode(ctx);
@@ -117,7 +98,6 @@ module.exports.generateConstraintPolynomialVerifierCode = function generateConst
         airId: res.airId,
         airgroupId: res.airgroupId,
         openingPoints: res.openingPoints,
-        symbolsUsed: [],
         verifierEvaluations: true,
     };
 
@@ -131,22 +111,15 @@ module.exports.generateConstraintPolynomialVerifierCode = function generateConst
         }
     }
 
-    if(expressions[res.cExpId].symbols) {
-        for(let k = 0; k < expressions[res.cExpId].symbols.length; k++) {
-            const symbolUsed = expressions[res.cExpId].symbols[k];
-            if(!ctx.symbolsUsed.find(s => s.op === symbolUsed.op && s.stage === symbolUsed.stage && s.id === symbolUsed.id)) {
-                ctx.symbolsUsed.push(symbolUsed);
-            };
-            if(["cm", "const", "custom"].includes(symbolUsed.op)) {
-                for(let l = 0; l < symbolUsed.rowsOffsets.length; ++l) {
-                    const prime = symbolUsed.rowsOffsets[l];
-                    const openingPos = res.openingPoints.findIndex(p => p === prime);
-                    const rf = { type: symbolUsed.op, id: symbolUsed.id, prime, openingPos };
-                    if(symbolUsed.op === "custom") rf.commitId = symbolUsed.commitId;
-                    ctx.evMap.push(rf);
-                }
-            }
-        }
+    const evals = [];
+    addInfoExpressionsSymbols(evals, symbols, expressions, expressions[res.cExpId]);
+
+    for(let k = 0; k < evals.length; k++) {
+        const prime = evals[k].prime;
+        const openingPos = res.openingPoints.findIndex(p => p === prime);
+        const rf = { type: evals[k].type, id: evals[k].id, prime, openingPos };
+        if(evals[k].type === "custom") rf.commitId = evals[k].commitId;
+        ctx.evMap.push(rf);
     }
 
     let qIndex = res.cmPolsMap.findIndex(p => p.stage === res.nStages + 1 && p.stageId === 0);
@@ -162,7 +135,9 @@ module.exports.generateConstraintPolynomialVerifierCode = function generateConst
     ctx.evMap.sort((a, b) => {
         const a_type = ["const", "cm"].includes(a.type) ? a.type : `custom${a.commitId}`;
         const b_type = ["const", "cm"].includes(b.type) ? b.type : `custom${b.commitId}`;
-        if(typeOrder[a_type] !== typeOrder[b_type]) {
+        if(a.openingPos != b.openingPos) {
+            return a.openingPos - b.openingPos;
+        } else if(typeOrder[a_type] !== typeOrder[b_type]) {
             return typeOrder[b_type] - typeOrder[a_type];
         } else if(a.id !== b.id) {
             return a.id - b.id;

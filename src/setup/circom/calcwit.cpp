@@ -36,12 +36,12 @@ Circom_CalcWit::Circom_CalcWit(Circom_Circuit *aCircuit, uint maxTh) {
     componentMemory = new Circom_Component[get_number_of_components()];
     // Initialize all component pointers to NULL to ensure safe cleanup
     for (uint i = 0; i < get_number_of_components(); i++) {
-        componentMemory[i].subcomponents = NULL;
-        componentMemory[i].subcomponentsParallel = NULL;
-        componentMemory[i].outputIsSet = NULL;
-        componentMemory[i].mutexes = NULL;
-        componentMemory[i].cvs = NULL;
-        componentMemory[i].sbct = NULL;
+        componentMemory[i].subcomponents = nullptr;
+        componentMemory[i].subcomponentsParallel = nullptr;
+        componentMemory[i].outputIsSet = nullptr;
+        componentMemory[i].mutexes = nullptr;
+        componentMemory[i].cvs = nullptr;
+        componentMemory[i].sbct = nullptr;
     }
 
     // circuitConstants = circuit ->circuitConstants;
@@ -53,6 +53,7 @@ Circom_CalcWit::Circom_CalcWit(Circom_Circuit *aCircuit, uint maxTh) {
     numThread = 0;
 }
 Circom_CalcWit::~Circom_CalcWit() {
+
   // Clean up any component memory that wasn't released during execution
   for (uint i = 0; i < get_number_of_components(); i++) {
     if (componentMemory[i].subcomponents) {
@@ -75,6 +76,7 @@ Circom_CalcWit::~Circom_CalcWit() {
     }
   }
   
+  // Let circom handle all component memory cleanup via release_memory_component()
   // Clean up listOfTemplateMessages if allocated
   if (listOfTemplateMessages) {
     delete[] listOfTemplateMessages;
