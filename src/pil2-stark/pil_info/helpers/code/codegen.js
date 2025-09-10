@@ -133,7 +133,7 @@ function fixDimensionsVerifier(ctx) {
 function fixCommitPol(r, ctx, symbols) {
     const symbol = symbols.find(s => s.type === "witness" && s.expId === r.id && s.airId === ctx.airId && s.airgroupId === ctx.airgroupId);
     if(!symbol) return;
-    if(symbol.imPol && (ctx.dom === "ext" || symbol.stage <= ctx.stage && ctx.calculated[r.id] && ctx.calculated[r.id][r.prime] && ctx.calculated[r.id][r.prime].cm)) {
+    if(symbol.imPol && (ctx.dom === "ext" || (symbol.stage <= ctx.stage && ctx.calculated[r.id] && ctx.calculated[r.id][r.prime] && ctx.calculated[r.id][r.prime].cm))) {
         r.type = "cm";
         r.id = symbol.polId;
         r.dim = symbol.dim;
