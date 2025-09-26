@@ -4,7 +4,7 @@ const { formatSymbols } = require("../pil2-stark/pil_info/utils");
 const { mapSymbols } = require("../pil2-stark/pil_info/map");
 const { assert } = require("console");
 
-const LATTICE_SIZE = 516;
+const LATTICE_SIZE = 372;
 
 async function fileExists(path) {
     return fs.promises.access(path, fs.constants.F_OK)
