@@ -26,7 +26,7 @@ module.exports.generateExpressionsCode = function generateExpressionsCode(res, s
                 ctx.calculated[expId] = {};
                 for(let i = 0; i < res.openingPoints.length; ++i) {
                     const openingPoint = res.openingPoints[i];
-                    ctx.calculated[expId][openingPoint] = { used: true };
+                    ctx.calculated[expId][openingPoint] = { cm: true };
                 }
             }
         }
@@ -62,7 +62,7 @@ module.exports.generateConstraintsDebugCode = function generateConstraintsDebugC
     const constraintsCode = [];
     for(let j = 0; j < constraints.length; ++j) {
         const ctx = {
-            stage: constraints[j].stage,
+            stage: res.nStages,
             calculated: {},
             tmpUsed: 0,
             code: [],
@@ -71,6 +71,15 @@ module.exports.generateConstraintsDebugCode = function generateConstraintsDebugC
             airgroupId: res.airgroupId,
         };    
 
+        for(let i = 0; i < symbols.length; i++) {
+            if(!symbols[i].imPol) continue;
+            const expId = symbols[i].expId;
+            ctx.calculated[expId] = {};
+            for(let i = 0; i < res.openingPoints.length; ++i) {
+                const openingPoint = res.openingPoints[i];
+                ctx.calculated[expId][openingPoint] = { cm: true };
+            }
+        }
         pilCodeGen(ctx, symbols, expressions, constraints[j].e, 0);
         const constraint = buildCode(ctx);
         constraint.boundary = constraints[j].boundary;
