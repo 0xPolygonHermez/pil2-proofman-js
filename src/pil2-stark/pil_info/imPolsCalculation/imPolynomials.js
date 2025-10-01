@@ -62,8 +62,6 @@ module.exports.addIntermediatePolynomials = function addIntermediatePolynomials(
 
         constraints.push({ e: constraintId, boundary: "everyRow", filename: `${res.name}.ImPol`, stage: expressions[expId].stage });
         
-        expressions[res.cExpId] = E.add(E.mul(vc, expressions[res.cExpId]), e);
-
         const weightedConstraint = E.mul(vc, E.exp(res.cExpId, 0, stage));
         expressions.push(weightedConstraint);
         let weightedConstraintId = expressions.length - 1;

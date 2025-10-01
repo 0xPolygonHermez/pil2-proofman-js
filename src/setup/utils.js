@@ -2,6 +2,9 @@ const fs =require("fs");
 const { getGlobalConstraintsInfo } = require("../pil2-stark/pil_info/getGlobalConstraintsInfo");
 const { formatSymbols } = require("../pil2-stark/pil_info/utils");
 const { mapSymbols } = require("../pil2-stark/pil_info/map");
+const { assert } = require("console");
+
+const LATTICE_SIZE = 372;
 
 async function fileExists(path) {
     return fs.promises.access(path, fs.constants.F_OK)
@@ -56,7 +59,7 @@ function generateStarkStruct(settings, nBits) {
 }
 
 
-async function setAiroutInfo(airout, curve = "EcGFp5") {
+async function setAiroutInfo(airout, curve) {
     let vadcopInfo = {};
 
     vadcopInfo.name = airout.name;
@@ -76,24 +79,31 @@ async function setAiroutInfo(airout, curve = "EcGFp5") {
         }
     }
   
-    vadcopInfo.curve = curve;
-    if (curve === "EcGFp5") {
-        vadcopInfo.curveConstants = {
-            A: ["6148914689804861439", "263", "0", "0", "0"],
-            B: ["15713893096167979237", "6148914689804861265", "0", "0", "0"],
-            Z: ["18446744069414584317", "18446744069414584320", "0", "0", "0"],
-            C1: ["6585749426319121644", "16990361517133133838", "3264760655763595284", "16784740989273302855", "13434657726302040770"],
-            C2: ["4795794222525505369", "3412737461722269738", "8370187669276724726", "7130825117388110979", "12052351772713910496"],
-        }
-    } else if (curve === "EcMasFp5") {
-        vadcopInfo.curveConstants = {
-            A: ["3", "0", "0", "0", "0"],
-            B: ["0", "0", "0", "0", "8"],
-            Z: ["9", "1", "0", "0", "0"],
-            C1: ["0", "0", "0", "0", "12297829379609722878"],
-            C2: ["17696091661387705534", "83405823114097643", "16387838525800286325", "16625873122103441396", "8400871913885497801"],
+    if (!curve) {
+        vadcopInfo.curve = "None";
+        vadcopInfo.latticeSize = LATTICE_SIZE;
+        assert(vadcopInfo.latticeSize %12 == 0, "Lattice size must be multiple of 12");
+    } else {
+        vadcopInfo.curve = curve;
+        if (curve === "EcGFp5") {
+            vadcopInfo.curveConstants = {
+                A: ["6148914689804861439", "263", "0", "0", "0"],
+                B: ["15713893096167979237", "6148914689804861265", "0", "0", "0"],
+                Z: ["18446744069414584317", "18446744069414584320", "0", "0", "0"],
+                C1: ["6585749426319121644", "16990361517133133838", "3264760655763595284", "16784740989273302855", "13434657726302040770"],
+                C2: ["4795794222525505369", "3412737461722269738", "8370187669276724726", "7130825117388110979", "12052351772713910496"],
+            }
+        } else if (curve === "EcMasFp5") {
+            vadcopInfo.curveConstants = {
+                A: ["3", "0", "0", "0", "0"],
+                B: ["0", "0", "0", "0", "8"],
+                Z: ["9", "1", "0", "0", "0"],
+                C1: ["0", "0", "0", "0", "12297829379609722878"],
+                C2: ["17696091661387705534", "83405823114097643", "16387838525800286325", "16625873122103441396", "8400871913885497801"],
+            }
         }
     }
+    
 
     vadcopInfo.nPublics = airout.numPublicValues;
     vadcopInfo.numChallenges = airout.numChallenges || [0];

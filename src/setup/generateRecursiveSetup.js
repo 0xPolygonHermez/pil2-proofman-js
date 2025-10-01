@@ -239,7 +239,7 @@ module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buil
     let globalInfo;
     let globalConstraints;
 
-    const airoutInfo = await setAiroutInfo(airout);
+    const airoutInfo = await setAiroutInfo(airout, "EcMasFp5");
     globalInfo = airoutInfo.vadcopInfo;
     globalConstraints = airoutInfo.globalConstraints;
 
