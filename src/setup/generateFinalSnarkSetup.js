@@ -50,7 +50,7 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     fs.copyFile(`${buildDir}/build/${template}_cpp/${template}.dat`, `${filesDir}/${template}.dat`, (err) => { if(err) throw err; });
      
     // Generate witness library
-    await runWitnessLibraryGeneration(buildDir, filesDir, template, template);
+    runWitnessLibraryGeneration(buildDir, filesDir, template, template);
  
     // Generate setup
     const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await compressorSetup(`${buildDir}/build/${template}.r1cs`, compressorCols);
@@ -69,7 +69,7 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     await fd.write(execBuff);
     await fd.close();
 
-    const starkStructSettings = { blowupFactor: 4, verificationHashType: "BN128", merkleTreeArity: 4, merkleTreeCustom: false };
+    const starkStructSettings = { blowupFactor: 3, verificationHashType: "BN128", merkleTreeArity: 4, merkleTreeCustom: false };
     const starkStructRecursiveF = generateStarkStruct(starkStructSettings, nBits);
 
     const airout = new AirOut(pilFile);
