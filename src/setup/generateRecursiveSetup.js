@@ -156,7 +156,7 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
 
 module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buildDir, setupOptions, circomPath, circomName, compressorCols) {
 
-    const nameFile = compressorCols == 36 ? "RecursiveC36" : "RecursiveC42";
+    const nameFile = `RecursiveC${compressorCols}`;
     const filesDir = path.join(buildDir, "provingKey", "build", nameFile, "airs", nameFile, "air");
 
     await fs.promises.mkdir(`${buildDir}/circom/`, { recursive: true });
