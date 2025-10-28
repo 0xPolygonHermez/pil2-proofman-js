@@ -282,37 +282,45 @@ extern "C" __attribute__((visibility("default"))) uint64_t getSizeWitness()  {
   return get_size_of_witness();
 }
 
-extern "C" __attribute__((visibility("default"))) void getWitness(void *zkin, char* datFile, void* pWitness, uint64_t nMutexes)  {
-    //-------------------------------------------
-    // Verifier stark proof
-    //-------------------------------------------
-    Circom_Circuit *circuit = loadCircuit(string(datFile));
+extern "C" __attribute__((visibility("default"))) int getWitness(void *zkin, char* datFile, void* pWitness, uint64_t nMutexes)  {
+    try {
+      //-------------------------------------------
+      // Verifier stark proof
+      //-------------------------------------------
+      Circom_Circuit *circuit = loadCircuit(string(datFile));
 
-    Circom_CalcWit *ctx = new Circom_CalcWit(circuit, nMutexes);
+      Circom_CalcWit *ctx = new Circom_CalcWit(circuit, nMutexes);
 
-    loadJsonImpl(ctx, *(json*) zkin);
+      loadJsonImpl(ctx, *(json*) zkin);
 
-    if (ctx->getRemaingInputsToBeSet() != 0)
-    {
-      cout << "Not all inputs have been set. Only " << to_string(get_main_input_signal_no() - ctx->getRemaingInputsToBeSet()) << " out of " << to_string(get_main_input_signal_no()) << endl;
-      exit(-1);
+      if (ctx->getRemaingInputsToBeSet() != 0)
+      {
+        cout << "Not all inputs have been set. Only " << to_string(get_main_input_signal_no() - ctx->getRemaingInputsToBeSet()) << " out of " << to_string(get_main_input_signal_no()) << endl;
+        exit(-1);
+      }
+
+      //-------------------------------------------
+      // Compute witness
+      //------------------------------------------- 
+      uint64_t sizeWitness = get_size_of_witness();
+      uint8_t* witness = (uint8_t *)pWitness;
+      FrElement v;
+      for (uint64_t i = 0; i < sizeWitness; i++)
+      {
+        FrElement aux;
+        ctx->getWitness(i, &v);
+        Fr_toLongNormal(&v, &v);
+        memcpy(witness + i * 32, &v.longVal, sizeof(v.longVal));
+      }
+      
+      delete ctx;
+      freeCircuit(circuit);
+    } catch (const std::exception &e) {
+        std::cerr << "Runtime error: " << e.what() << std::endl;
+        exit(-1);
+    } catch (...) {
+        std::cerr << "Unknown runtime error" << std::endl;
+        exit(-2);
     }
-
-    //-------------------------------------------
-    // Compute witness
-    //------------------------------------------- 
-    uint64_t sizeWitness = get_size_of_witness();
-    uint8_t* witness = (uint8_t *)pWitness;
-    FrElement v;
-    for (uint64_t i = 0; i < sizeWitness; i++)
-    {
-      FrElement aux;
-      ctx->getWitness(i, &v);
-      Fr_toLongNormal(&v, &v);
-      memcpy(witness + i * 32, &v.longVal, sizeof(v.longVal));
-    }
-    
-    delete ctx;
-    freeCircuit(circuit);
 }
 

@@ -314,58 +314,69 @@ extern "C" __attribute__((visibility("default"))) void freeCircuit(void* circuit
     freeCircuit(circuit);
 }
 
-extern "C" __attribute__((visibility("default"))) void getWitnessFinal(void *zkin, char* datFile, void* pWitness, uint64_t nMutexes)  {
-    //-------------------------------------------
-    // Verifier stark proof
-    //-------------------------------------------
-    Circom_Circuit *circuit = loadCircuit(string(datFile));
+extern "C" __attribute__((visibility("default"))) int getWitnessFinal(void *zkin, char* datFile, void* pWitness, uint64_t nMutexes)  {
+    try {
+      //-------------------------------------------
+      // Verifier stark proof
+      //-------------------------------------------
+      Circom_Circuit *circuit = loadCircuit(string(datFile));
 
-    Circom_CalcWit *ctx = new Circom_CalcWit(circuit, nMutexes);
+      Circom_CalcWit *ctx = new Circom_CalcWit(circuit, nMutexes);
 
-    loadJsonImpl(ctx, *(json*) zkin);
+      loadJsonImpl(ctx, *(json*) zkin);
 
-    if (ctx->getRemaingInputsToBeSet() != 0)
-    {
-      cout << "Not all inputs have been set. Only " << to_string(get_main_input_signal_no() - ctx->getRemaingInputsToBeSet()) << " out of " << to_string(get_main_input_signal_no()) << endl;
-      exit(-1);
+      if (ctx->getRemaingInputsToBeSet() != 0)
+      {
+        cout << "Not all inputs have been set. Only " << to_string(get_main_input_signal_no() - ctx->getRemaingInputsToBeSet()) << " out of " << to_string(get_main_input_signal_no()) << endl;
+        exit(-1);
+      }
+
+      for(uint64_t i = 0; i < get_main_input_signal_no(); ++i) {
+        cout << i << " " << ctx->signalValues[get_main_input_signal_start() + i] << endl;
+      }
+
+      //-------------------------------------------
+      // Compute witness
+      //------------------------------------------- 
+      uint64_t *witness = (uint64_t *)pWitness;
+      uint64_t sizeWitness = get_size_of_witness();
+      for (uint64_t i = 0; i < sizeWitness; i++)
+      {
+        ctx->getWitness(i, witness[i]);
+      }
+      
+      delete ctx;
+      freeCircuit(circuit);
+    } catch (const std::exception &e) {
+        std::cerr << "Runtime error: " << e.what() << std::endl;
+        exit(-1);
+    } catch (...) {
+        std::cerr << "Unknown runtime error" << std::endl;
+        exit(-2);
     }
-
-    for(uint64_t i = 0; i < get_main_input_signal_no(); ++i) {
-      cout << i << " " << ctx->signalValues[get_main_input_signal_start() + i] << endl;
-    }
-
-    //-------------------------------------------
-    // Compute witness
-    //------------------------------------------- 
-    uint64_t *witness = (uint64_t *)pWitness;
-    uint64_t sizeWitness = get_size_of_witness();
-    for (uint64_t i = 0; i < sizeWitness; i++)
-    {
-      ctx->getWitness(i, witness[i]);
-    }
-    
-    delete ctx;
-    freeCircuit(circuit);
 }
 
-extern "C" __attribute__((visibility("default"))) void getWitness(uint64_t *proof, void* circuit_, void* pWitness, uint64_t nMutexes) {
-    //-------------------------------------------
-    // Verifier stark proof
-    //-------------------------------------------
-    Circom_Circuit *circuit = (Circom_Circuit *)circuit_;
+extern "C" __attribute__((visibility("default"))) int getWitness(uint64_t *proof, void* circuit_, void* pWitness, uint64_t nMutexes) {
+    try {
+        Circom_Circuit *circuit = (Circom_Circuit *)circuit_;
+        Circom_CalcWit *ctx = new Circom_CalcWit(circuit, nMutexes);
 
-    Circom_CalcWit *ctx = new Circom_CalcWit(circuit, nMutexes);
+        memcpy(&ctx->signalValues[get_main_input_signal_start()], proof, get_main_input_signal_no() * sizeof(uint64_t));
+        ctx->runCircuit();
 
-    memcpy(&ctx->signalValues[get_main_input_signal_start()], proof, get_main_input_signal_no() * sizeof(uint64_t));
-    ctx->runCircuit();
+        uint64_t *witness = (uint64_t *)pWitness;
+        uint64_t sizeWitness = get_size_of_witness();
+        for (uint64_t i = 0; i < sizeWitness; i++) {
+            ctx->getWitness(i, witness[i]);
+        }
 
-    //-------------------------------------------
-    // Compute witness
-    //------------------------------------------- 
-    uint64_t *witness = (uint64_t *)pWitness;
-    uint64_t sizeWitness = get_size_of_witness();
-    for (uint64_t i = 0; i < sizeWitness; i++) {
-      ctx->getWitness(i, witness[i]);
+        delete ctx;
+        return 0; // success
+    } catch (const std::exception &e) {
+        std::cerr << "Runtime error: " << e.what() << std::endl;
+        return -1;
+    } catch (...) {
+        std::cerr << "Unknown runtime error" << std::endl;
+        return -2;
     }
-    delete ctx;
 }
