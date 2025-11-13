@@ -53,7 +53,7 @@ async function run() {
             if (starkStructsInfo[airgroup.name] && starkStructsInfo[airgroup.name][air.name]) {
                 settings = starkStructsInfo[airgroup.name][air.name];
             }
-            let starkStruct = generateStarkStruct(settings, log2(air.numRows));
+            let starkStruct = generateStarkStruct(settings, log2(air.numRows), true);
             log.info("[Stats  Cmd]", `··· Computing stats for air '${air.name}'`);
             const setup = await starkSetup(air, starkStruct, setupOptions);
             statsFileInfo.push(`Airgroup: ${airgroup.name} Air: ${air.name}`);

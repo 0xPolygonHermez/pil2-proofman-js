@@ -17,6 +17,7 @@ const argv = require("yargs")
     .alias("w", "ptau")
     .alias("f", "final")
     .alias("u", "fixed")
+    .alias("c", "no_conjecture")
         .argv;
 
 async function run() {
@@ -66,6 +67,7 @@ async function run() {
             powersOfTauFile,
             stdPath: argv.stdPath,
             fixedPath: argv.fixed,
+            useNoConjecture: argv.noconjecture || false,
         }
     }
 
