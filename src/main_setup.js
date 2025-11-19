@@ -17,7 +17,7 @@ const argv = require("yargs")
     .alias("w", "ptau")
     .alias("f", "final")
     .alias("u", "fixed")
-    .alias("c", "no_conjecture")
+    .alias("c", "noconjecture")
         .argv;
 
 async function run() {
