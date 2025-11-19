@@ -11,7 +11,7 @@ const execPromise = util.promisify(exec);
 const tmp = require('os').tmpdir();
 
 
-module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot, starkInfo, verifierInfo, starkInfoFile) {
+module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot, starkInfo, verifierInfo, starkInfoFile, useNoConjecture=false) {
 
     const tempDir = await fs.promises.mkdtemp(path.join(tmp, 'compressor-'));
 
@@ -51,13 +51,15 @@ module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot,
 
     await fs.promises.rm(tempDir, { recursive: true, force: true });
     
-    if(nBitsC18 > 17) {
+    let recursiveBits = useNoConjecture ? 18 : 17;
+
+    if(nBitsC18 > recursiveBits) {
         return { hasCompressor: true, nBits: nBitsC18 };
-    } else if(nBitsC18 === 17) {
+    } else if(nBitsC18 === recursiveBits) {
         return { hasCompressor: false, nCols: 36 };
     } else {
         const nRowsPerFri = NUsed / starkInfo.starkStruct.nQueries;
-        const minimumQueriesRequired = Math.ceil((2**16 + 2**12) / nRowsPerFri);
+        const minimumQueriesRequired = Math.ceil((2**(recursiveBits - 1) + 2**12) / nRowsPerFri);
         
         starkInfo.starkStruct.nQueries = minimumQueriesRequired;
         await fs.promises.writeFile(starkInfoFile, JSON.stringify(starkInfo, null, 1), "utf8");

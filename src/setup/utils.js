@@ -13,7 +13,7 @@ async function fileExists(path) {
 }
 
 
-function generateStarkStruct(settings, nBits) {
+function generateStarkStruct(settings, nBits, useNoConjecture=false) {
     let starkStruct = {
         nBits,
     };
@@ -25,7 +25,7 @@ function generateStarkStruct(settings, nBits) {
     
     let hashCommits = settings.hashCommits || true;
     let blowupFactor = settings.blowupFactor || 1;
-    let nQueries = Math.ceil(128 / blowupFactor);
+    let nQueries = useNoConjecture ? Math.floor(256 / blowupFactor) : Math.ceil(128 / blowupFactor);
     if(settings.nQueries > nQueries) nQueries = settings.nQueries;
     let foldingFactor = settings.foldingFactor || 4;
     let finalDegree = settings.finalDegree || 5;
