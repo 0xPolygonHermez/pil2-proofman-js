@@ -51,7 +51,7 @@ module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot,
 
     await fs.promises.rm(tempDir, { recursive: true, force: true });
     
-    let recursiveBits = useNoConjecture ? 18 : 17;
+    let recursiveBits = 17;
 
     if(nBitsC18 > recursiveBits) {
         return { hasCompressor: true, nBits: nBitsC18 };

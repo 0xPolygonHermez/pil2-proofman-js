@@ -4,7 +4,8 @@ const { formatSymbols } = require("../pil2-stark/pil_info/utils");
 const { mapSymbols } = require("../pil2-stark/pil_info/map");
 const { assert } = require("console");
 
-const LATTICE_SIZE = 372;
+const MERKLE_TREE_ARITY = 4;
+const LATTICE_SIZE = MERKLE_TREE_ARITY == 4 ? 368 : 372;
 
 async function fileExists(path) {
     return fs.promises.access(path, fs.constants.F_OK)
@@ -25,9 +26,9 @@ function generateStarkStruct(settings, nBits, useNoConjecture=false) {
     
     let hashCommits = settings.hashCommits || true;
     let blowupFactor = settings.blowupFactor || 1;
-    let nQueries = useNoConjecture ? Math.floor(256 / blowupFactor) : Math.ceil(128 / blowupFactor);
+    let nQueries = useNoConjecture ? Math.floor(230 / blowupFactor) : Math.ceil(128 / blowupFactor);
     if(settings.nQueries > nQueries) nQueries = settings.nQueries;
-    let foldingFactor = settings.foldingFactor || 4;
+    let foldingFactor = settings.foldingFactor || 3;
     let finalDegree = settings.finalDegree || 5;
     
     if(verificationHashType === "BN128") {
@@ -35,7 +36,7 @@ function generateStarkStruct(settings, nBits, useNoConjecture=false) {
         starkStruct.merkleTreeCustom = settings.merkleTreeCustom || false;
         hashCommits = false;
     } else {
-        starkStruct.merkleTreeArity = 3;
+        starkStruct.merkleTreeArity = MERKLE_TREE_ARITY;
         starkStruct.merkleTreeCustom = true;
     }
     
@@ -47,8 +48,6 @@ function generateStarkStruct(settings, nBits, useNoConjecture=false) {
     starkStruct.steps = [{nBits: starkStruct.nBitsExt}];
     let friStepBits = starkStruct.nBitsExt;
     while (friStepBits > finalDegree) {
-        if (!settings.foldingFactor && friStepBits - 6 == finalDegree) foldingFactor = 3;
-        if (!settings.foldingFactor && friStepBits - 9 == finalDegree) foldingFactor = 3;
         friStepBits = Math.max(friStepBits - foldingFactor, finalDegree);
         starkStruct.steps.push({
             nBits: friStepBits,
@@ -82,7 +81,7 @@ async function setAiroutInfo(airout, curve) {
     if (!curve) {
         vadcopInfo.curve = "None";
         vadcopInfo.latticeSize = LATTICE_SIZE;
-        assert(vadcopInfo.latticeSize %12 == 0, "Lattice size must be multiple of 12");
+        assert(vadcopInfo.latticeSize % (MERKLE_TREE_ARITY * 4) == 0, "Lattice size must be multiple of ", MERKLE_TREE_ARITY * 4);
     } else {
         vadcopInfo.curve = curve;
         if (curve === "EcGFp5") {

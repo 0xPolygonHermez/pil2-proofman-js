@@ -126,7 +126,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         recursiveSettings = proofManagerConfig.setup.settings.recursive;
         }
 
-        let recursiveBits = setupOptions.useNoConjecture ? 18 : 17;
+        let recursiveBits = 17;
         let starkStructRecursive = recursiveSettings.starkStruct || generateStarkStruct(recursiveSettings, recursiveBits, setupOptions.useNoConjecture);
 
         const constRootsRecursives1 = [];
