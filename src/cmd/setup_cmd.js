@@ -126,7 +126,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         recursiveSettings = proofManagerConfig.setup.settings.recursive;
         }
 
-        let recursiveBits = setupOptions.useNoConjecture ? 18 : 17;
+        let recursiveBits = 17;
         let starkStructRecursive = recursiveSettings.starkStruct || generateStarkStruct(recursiveSettings, recursiveBits, setupOptions.useNoConjecture);
 
         const constRootsRecursives1 = [];
@@ -166,7 +166,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         const recursiveSetup = await genRecursiveSetup(
         buildDir, setupOptions, "compressor", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
         setup[airgroup.airgroupId][air.airId].constRoot, [], setup[airgroup.airgroupId][air.airId].starkInfo,
-        setup[airgroup.airgroupId][air.airId].verifierInfo, starkStructCompressor, 36
+        setup[airgroup.airgroupId][air.airId].verifierInfo, starkStructCompressor, 59
         );
     
         ({ constRoot, starkInfo, verifierInfo } = recursiveSetup);
@@ -184,7 +184,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         pil: pilRecursive1
         } = await genRecursiveSetup(
         buildDir, setupOptions, "recursive1", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
-        constRoot, [], starkInfo, verifierInfo, starkStructRecursive, 36,
+        constRoot, [], starkInfo, verifierInfo, starkStructRecursive, 59,
         setup[airgroup.airgroupId][air.airId].hasCompressor
         );
     
@@ -214,7 +214,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         buildDir, setupOptions, "recursive2", airgroup.name, airgroup.airgroupId,
         undefined, globalInfo, [], constRootsRecursives1[airgroup.airgroupId],
         starkInfoRecursives1[airgroup.airgroupId][0], verifierInfoRecursives1[airgroup.airgroupId][0],
-        starkStructRecursive, 36
+        starkStructRecursive, 59
         );
     
         const hashPilRecursive2 = crypto.createHash("sha256")
@@ -234,7 +234,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         const {starkInfoFinal,
             constRootFinal,
             verifierInfoFinal,
-        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 42);
+        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 59);
         
         if(proofManagerConfig.setup.genFinalSnarkSetup) {
             await genFinalSnarkSetup(

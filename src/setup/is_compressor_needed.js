@@ -43,7 +43,7 @@ module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot,
     
     const r1cs = await readR1cs(tmpR1csFilename);
 
-    const {NUsed} = getCompressorConstraints(r1cs, 36);
+    const {NUsed} = getCompressorConstraints(r1cs, 59);
     
     console.log("Number of rows used", NUsed);
 
@@ -51,12 +51,12 @@ module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot,
 
     await fs.promises.rm(tempDir, { recursive: true, force: true });
     
-    let recursiveBits = useNoConjecture ? 18 : 17;
+    let recursiveBits = 17;
 
     if(nBitsC18 > recursiveBits) {
         return { hasCompressor: true, nBits: nBitsC18 };
     } else if(nBitsC18 === recursiveBits) {
-        return { hasCompressor: false, nCols: 36 };
+        return { hasCompressor: false, nCols: 59 };
     } else {
         const nRowsPerFri = NUsed / starkInfo.starkStruct.nQueries;
         const minimumQueriesRequired = Math.ceil((2**(recursiveBits - 1) + 2**12) / nRowsPerFri);
@@ -64,7 +64,7 @@ module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot,
         starkInfo.starkStruct.nQueries = minimumQueriesRequired;
         await fs.promises.writeFile(starkInfoFile, JSON.stringify(starkInfo, null, 1), "utf8");
 
-        return { hasCompressor: false, nCols: 36 };
+        return { hasCompressor: false, nCols: 59 };
     }
     
 }
