@@ -27,9 +27,9 @@ async function run() {
     const circomName = argv.circomName;
     
     // Validate and set nCols
-    const nCols = argv.nCols || 36;
-    if (nCols !== 36 && nCols !== 42 && nCols !== 12) {
-        throw new Error("nCols must be either 36 or 42 or 12");
+    const nCols = argv.nCols || 59;
+    if (nCols !== 59 && nCols !== 42 && nCols !== 12) {
+        throw new Error("nCols must be either 59 or 42 or 12");
     }
 
     await fs.promises.mkdir(buildDir, { recursive: true });
