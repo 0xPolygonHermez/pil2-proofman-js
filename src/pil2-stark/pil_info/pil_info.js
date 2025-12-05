@@ -1,4 +1,5 @@
 const {calculateIntermediatePolynomials, addIntermediatePolynomials} = require("./imPolsCalculation/imPolynomials");
+const { FIELD_EXTENSION } = require("../../constants.js");
 
 const { preparePil } = require("./helpers/preparePil");
 const { generatePilCode } = require("./helpers/generatePilCode");
@@ -91,7 +92,7 @@ module.exports = async function pilInfo(pil, starkStruct, options = {}) {
     }
 
     const imPols = res.cmPolsMap.filter(p => p.imPol);
-    summary += `| ImPols: ${imPols.length} => ${imPols.reduce((acc, curr) => acc + curr.dim, 0)} = ${imPols.filter(i => i.dim === 1).reduce((acc, curr) => acc + curr.dim, 0)} + ${imPols.filter(i => i.dim === 3).reduce((acc, curr) => acc + curr.dim, 0)} `;
+    summary += `| ImPols: ${imPols.length} => ${imPols.reduce((acc, curr) => acc + curr.dim, 0)} = ${imPols.filter(i => i.dim === 1).reduce((acc, curr) => acc + curr.dim, 0)} + ${imPols.filter(i => i.dim === FIELD_EXTENSION).reduce((acc, curr) => acc + curr.dim, 0)} `;
     
     if(res.evMap) summary += `| Total: ${nColumnsBaseField} | nConstraints: ${constraints.length}`;
     if(res.openingPoints) summary += ` | nOpeningPoints: ${res.openingPoints.length}`;
@@ -171,11 +172,11 @@ function getProverMemory(res) {
         prover_memory = offset_traces;
     }
 
-    prover_memory += (3 + 3 + res.boundaries.length) * n_extended;
+    prover_memory += (FIELD_EXTENSION + FIELD_EXTENSION + res.boundaries.length) * n_extended;
     
     for(let i = 0; i < res.starkStruct.steps.length - 1; ++i) {
         let height = 1 << res.starkStruct.steps[i + 1].nBits;
-        let width = ((1 << res.starkStruct.steps[i].nBits) / height) * 3;
+        let width = ((1 << res.starkStruct.steps[i].nBits) / height) * FIELD_EXTENSION;
         prover_memory += height * width + getNumNodesMT(height, res.starkStruct);
     }
 

@@ -1,3 +1,5 @@
+const { FIELD_EXTENSION } = require("../../constants.js");
+
 class ExpressionOps {
 
     add(a, b) {
@@ -76,7 +78,7 @@ class ExpressionOps {
         return {
             op: "f",
             id: 0,
-            dim: 3
+            dim: FIELD_EXTENSION
         }
     }
 

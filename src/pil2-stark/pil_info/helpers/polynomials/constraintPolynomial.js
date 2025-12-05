@@ -1,12 +1,13 @@
 const ExpressionOps = require("../../expressionops");
 const { calculateExpDeg } = require("../../imPolsCalculation/imPolynomials");
 const { getExpDim, addInfoExpressions } = require("../helpers");
+const { FIELD_EXTENSION } = require("../../../../constants.js");
 
 module.exports.generateConstraintPolynomial = function generateConstraintPolynomial(res, expressions, symbols, constraints) {
 
     const E = new ExpressionOps();
 
-    const dim = 3;
+    const dim = FIELD_EXTENSION;
     const stage = res.nStages + 1;
 
     const vc_id = symbols.filter(s => s.type === "challenge" && s.stage < stage).length;
@@ -59,7 +60,7 @@ module.exports.generateConstraintPolynomial = function generateConstraintPolynom
     res.qDim = getExpDim(expressions, res.cExpId);
 
     const xi_id = symbols.filter(s => s.type === "challenge" && s.stage < stage + 1).length;
-    symbols.push({type: "challenge", name: "std_xi", stage: stage + 1, dim: 3, stageId: 0, id: xi_id})
+    symbols.push({type: "challenge", name: "std_xi", stage: stage + 1, dim: FIELD_EXTENSION, stageId: 0, id: xi_id})
 
     const initial_q_degree = calculateExpDeg(expressions, expressions[res.cExpId], [], true);
 
