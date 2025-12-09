@@ -59,7 +59,10 @@ class UDR extends DecodingRegime {
         // How close we are to the Unique Decoding Bound (1 - rate) / 2
 
         // TODO: Heuristic correction to stay within the decoding radius
-        const correction = this.fieldSize >= (1n << 150n) ? 1 / this.codewordLength : this.rate / 20;
+        const correction =
+            this.fieldSize >= 1n << 150n
+                ? 1 / this.codewordLength
+                : this.rate / 20;
 
         const pp = this.maxDecodingRadius - correction;
         assert(pp > 0, "Proximity parameter must be positive in UDR");
@@ -98,7 +101,10 @@ class JBR extends DecodingRegime {
         // How close we are to the Johnson Bound 1-sqrt(rate)
 
         // TODO: Let's use a heuristic to figure out the proximity parameter here.
-        const correction = this.fieldSize >= (1n << 150n) ? 1 / this.codewordLength : this.rate / 20;
+        const correction =
+            this.fieldSize >= 1n << 150n
+                ? 1 / this.codewordLength
+                : this.rate / 20;
 
         const pp = this.maxDecodingRadius - correction;
         assert(pp > 0, "Proximity parameter must be positive in JBR");
@@ -129,9 +135,11 @@ class JBR extends DecodingRegime {
         const m_shifted = m + 0.5;
 
         const numerator = (2 * m_shifted ** 5 + 3 * m_shifted * this.rate) * n;
-        const denominator = new Decimal(3 * this.rate * this.sqrtRate).mul(this.fieldSize);
+        const denominator = new Decimal(3 * this.rate * this.sqrtRate).mul(
+            this.fieldSize
+        );
 
-        return new Decimal(numerator).div(denominator); 
+        return new Decimal(numerator).div(denominator);
     }
 }
 
@@ -141,14 +149,95 @@ class JBR extends DecodingRegime {
 class FRISecurityCalculator {
     constructor(regime, params) {
         this.regime = regime;
+        this.treeArity = params.treeArity ?? 2;
         this.nFunctions = params.nFunctions;
         this.foldingFactors = params.foldingFactors;
-        this.nGrindingBits = params.nGrindingBits;
-        this.nQueries = params.nQueries;
+
+        // Query Phase parameters
+        this.targetSecurityBits =
+            params.targetSecurityBits ?? DEFAULT_TARGET_SECURITY_BITS;
+        if (params.nQueries !== undefined) {
+            this.nQueries = params.nQueries;
+            this.nGrindingBits = params.nGrindingBits ?? 0;
+        } else if (params.maxGrindingBits !== undefined) {
+            const optimal = this._calculateOptimalQueryParams(
+                this.targetSecurityBits,
+                params.maxGrindingBits
+            );
+            this.nQueries = optimal.nQueries;
+            this.nGrindingBits = optimal.nGrindingBits;
+        } else {
+            throw new Error("Must provide either nQueries or maxGrindingBits");
+        }
+    }
+
+    _calculateMTPHashes(nLeafs) {
+        return (this.treeArity - 1) * Math.ceil(Math.log2(nLeafs) / Math.log2(this.treeArity));
+    }
+
+    _calculateQueryNumHashes() {
+        // To be precise, to check one query one needs to:
+        //   a) Send MTP for fi(qj) for each folded function fi and each folding factor j
+        //   b) Send MTP for gi(q0) for each input function gi
+        // Where MTP is the Merkle Tree Proof, which involves (arity - 1) * log(nFunctions) hashes
+        // In total:
+        //   a) sumj foldingFactors[j] * (arity - 1) * log2(n/prod k foldingFactors[k <= j]) hashes (except the last one)
+        //   b) nFunctions * foldingFactors[0] * (arity - 1) * log2(n) hashes
+        let accFoldingFactor = 1;
+        let totalHashes = 0;
+        for (let j = 0; j < this.foldingFactors.length - 1; j++) {
+            const nLeafs = this.regime.codewordLength / accFoldingFactor;
+            totalHashes += this.foldingFactors[j] * this._calculateMTPHashes(nLeafs);
+            accFoldingFactor *= this.foldingFactors[j];
+        }
+        const nLeafsInput = this.regime.codewordLength;
+        totalHashes += this.foldingFactors[0] * this._calculateMTPHashes(nLeafsInput);
+
+        return totalHashes;
+    }
+
+    _calculateOptimalQueryParams(targetSecurityBits, maxGrindingBits) {
+        // Security bits per query
+        const singleQueryError = this.calculateSingleQueryError();
+        const bitsPerQuery = -Math.log2(singleQueryError);
+
+        // Cost per query (in hash operations)
+        const hashesPerQuery = this._calculateQueryNumHashes();
+
+        // Find optimal nQueries and nGrindingBits
+        // Goal: nQueries * bitsPerQuery + nGrindingBits >= targetSecurityBits
+        //
+        // Strategy:
+        // 1. Add grinding bits while 2^grindingBits < hashesPerQuery
+        // 2. Once grinding costs more than a query, use queries for the rest
+
+        // Find max grinding where grinding is still cheaper than one query
+        // 2^g < hashesPerQuery  =>  g < log2(hashesPerQuery)
+        const maxEfficientGrinding = Math.floor(Math.log2(hashesPerQuery));
+        const nGrindingBits = Math.min(maxEfficientGrinding, maxGrindingBits);
+
+        const neededFromQueries = targetSecurityBits - nGrindingBits;
+        const nQueries = neededFromQueries > 0 
+            ? Math.ceil(neededFromQueries / bitsPerQuery)
+            : 1; // Need at least 1 query
+
+        return {
+            nQueries,
+            nGrindingBits,
+        };
     }
 
     get nCommitRounds() {
         return this.foldingFactors.length;
+    }
+
+    /**
+     * Grinding Phase
+     *
+     * Reduces error probability by a factor of 2^grindingBits
+     */
+    calculateGrindingError(grindingBits) {
+        return new Decimal(1).div(new Decimal(2).pow(grindingBits));
     }
 
     /**
@@ -170,47 +259,55 @@ class FRISecurityCalculator {
     }
 
     /**
+     * Phase 3: Single Query Error
+     *
+     * Probability that a single query misses an inconsistency
+     */
+    calculateSingleQueryError() {
+        return 1 - this.regime.proximityParameter;
+    }
+
+    /**
      * Phase 3: Query Phase
+     *
      * Verifier queries random positions to check consistency
      */
     calculateQueryPhaseError() {
-        const base = 1 - this.regime.proximityParameter;
-        const numerator = new Decimal(base).pow(this.nQueries);
-        const denominator = new Decimal(2).pow(this.nGrindingBits);
-        return numerator.div(denominator);
+        const grindingError = this.calculateGrindingError(this.nGrindingBits);
+        const singleQueryError = this.calculateSingleQueryError();
+        const queryError = new Decimal(singleQueryError).pow(this.nQueries);
+        return queryError.mul(grindingError);
+    }
+
+    calculateBatchCommitError() {
+        const batchError = this.calculateBatchPhaseError();
+
+        let commitError = new Decimal(0);
+        for (let i = 0; i < this.nCommitRounds; i++) {
+            const roundError = this.calculateCommitPhaseError(i);
+            commitError = Decimal.max(commitError, roundError);
+        }
+
+        // Overall error is the maximum of batch and commit errors
+        return Decimal.max(batchError, commitError);
     }
 
     /**
      * Calculate total FRI security in bits
      */
-    calculateError() {
-        const errors = [];
-
-        // Batch phase error
-        errors.push(this.calculateBatchPhaseError());
-
-        // Commit phase errors
-        for (let i = 0; i < this.nCommitRounds; i++) {
-            errors.push(this.calculateCommitPhaseError(i));
-        }
-
-        // Query phase error
-        errors.push(this.calculateQueryPhaseError());
-
-        // Security is limited by the worst (maximum) error
-        const maxError = Decimal.max(...errors);
-
-        return maxError;
+    calculateTotalError() {
+        const batchCommitError = this.calculateBatchCommitError();
+        const queryError = this.calculateQueryPhaseError();
+        return Decimal.max(batchCommitError, queryError);
     }
 
     /**
      * Get breakdown of security by phase
      */
     getSecurityBreakdown() {
+        // calculate errors per phase
         const batchError = this.calculateBatchPhaseError();
-        const queryError = this.calculateQueryPhaseError();
 
-        // Calculate per-round commit errors
         const commitRounds = [];
         let worstCommitError = new Decimal(0);
         for (let i = 0; i < this.nCommitRounds; i++) {
@@ -219,37 +316,47 @@ class FRISecurityCalculator {
             commitRounds.push({
                 round: i,
                 foldingFactor: this.foldingFactors[i],
-                error: roundError,
                 securityBits: get_security_from_error(roundError),
             });
         }
 
-        // Security is limited by the maximum error (minimum security)
-        const maxError = Decimal.max(batchError, worstCommitError, queryError);
+        const queryError = this.calculateQueryPhaseError();
+
+        // Overall error
+        const totalError = Decimal.max(
+            batchError,
+            worstCommitError,
+            queryError
+        );
 
         return {
             batchPhase: {
                 nFunctions: this.nFunctions,
-                error: batchError,
                 securityBits: get_security_from_error(batchError),
             },
             commitPhase: {
-                nRounds: this.nCommitRounds,
                 rounds: commitRounds,
-                worstError: worstCommitError,
                 securityBits: get_security_from_error(worstCommitError),
             },
             queryPhase: {
                 nQueries: this.nQueries,
                 nGrindingBits: this.nGrindingBits,
-                error: queryError,
                 securityBits: get_security_from_error(queryError),
             },
             total: {
-                error: maxError,
-                securityBits: get_security_from_error(maxError),
-            },
+                securityBits: get_security_from_error(totalError),
+            }
         };
+    }
+
+    formatParameters() {
+        const lines = [];
+        lines.push("FRI Parameters:");
+        lines.push(`  - Num Functions: ${this.nFunctions}`);
+        lines.push(`  - Folding Factors: [${this.foldingFactors.join(", ")}]`);
+        lines.push(`  - Num Queries: ${this.nQueries}`);
+        lines.push(`  - Query Grinding Bits: ${this.nGrindingBits}`);
+        return lines.join("\n");
     }
 
     formatReport() {
@@ -260,9 +367,7 @@ class FRISecurityCalculator {
         lines.push(
             `  - Batch Phase (${b.batchPhase.nFunctions} functions): ${b.batchPhase.securityBits} bits`
         );
-        lines.push(
-            `  - Commit Phase: ${b.commitPhase.securityBits} bits`
-        );
+        lines.push(`  - Commit Phase: ${b.commitPhase.securityBits} bits`);
         for (const round of b.commitPhase.rounds) {
             lines.push(
                 `    · Round ${round.round} (fold ${round.foldingFactor}x): ${round.securityBits} bits`
@@ -282,6 +387,8 @@ class FRISecurityCalculator {
  */
 class SecurityCalculator {
     constructor(params) {
+        this.name = params.name ?? "";
+
         // Store original parameters
         this.dimension = params.dimension;
         this.rate = params.rate;
@@ -295,7 +402,6 @@ class SecurityCalculator {
 
         // Field parameters
         this.fieldSize = new Decimal(params.fieldSize);
-        this.fieldBits = Decimal.log2(this.fieldSize);
 
         // Create the appropriate regime
         const regimeParams = {
@@ -309,7 +415,9 @@ class SecurityCalculator {
         } else if (params.regime === "UDR") {
             this.regime = new UDR(regimeParams);
         } else {
-            throw new Error(`Unknown decoding regime: ${params.regime}`);
+            throw new Error(
+                `Unknown decoding regime: ${params.regime}. Supported regimes are "JBR" and "UDR".`
+            );
         }
 
         // Constraint parameters
@@ -320,7 +428,7 @@ class SecurityCalculator {
         this.nFunctions = params.nFunctions;
         this.foldingFactors = params.foldingFactors;
         this.nQueries = params.nQueries;
-        this.nGrindingBits = params.nGrindingBits ?? 0;
+        this.nGrindingBits = params.nGrindingBits;
 
         // Create FRI calculator
         this.friCalculator = new FRISecurityCalculator(this.regime, {
@@ -328,6 +436,7 @@ class SecurityCalculator {
             foldingFactors: this.foldingFactors,
             nQueries: this.nQueries,
             nGrindingBits: this.nGrindingBits,
+            maxGrindingBits: params.maxGrindingBits,
         });
 
         // Target
@@ -350,16 +459,19 @@ class SecurityCalculator {
 
     // Domain Extending for Eliminating Pretenders (DEEP) Security
     calculateDEEPError() {
-        const numerator = this.regime.maxListSize *
+        const numerator =
+            this.regime.maxListSize *
             ((this.maxConstraintDegree - 1) * (this.augmentedDimension - 1) +
                 (this.dimension - 1));
-        const denominator = this.fieldSize.minus(this.codewordLength + this.dimension);
+        const denominator = this.fieldSize.minus(
+            this.codewordLength + this.dimension
+        );
         return new Decimal(numerator).div(denominator);
     }
 
     // Fast Reed-Solomon IOPP (FRI) Security
     calculateFRIError() {
-        return this.friCalculator.calculateError();
+        return this.friCalculator.calculateTotalError();
     }
 
     calculateTotalError() {
@@ -395,8 +507,8 @@ class SecurityCalculator {
         const bottleneck = total_security.equals(ali_security)
             ? "ALI"
             : total_security.equals(deep_security)
-            ? "DEEP"
-            : "FRI";
+              ? "DEEP"
+              : "FRI";
 
         return {
             // Regime info
@@ -423,9 +535,9 @@ class SecurityCalculator {
         const b = this.getSecurityBreakdown();
         const lines = [];
 
-        lines.push(
-            "==================== SECURITY ANALYSIS ===================="
-        );
+        lines.push("==================== SECURITY ANALYSIS ====================");
+        if (this.name) lines.push(`${this.name}`);
+        lines.push("");
         lines.push(`Target Security: ${this.targetSecurityBits} bits`);
         lines.push("");
 
@@ -433,33 +545,33 @@ class SecurityCalculator {
         lines.push(`  - Regime: ${b.regime}`);
         lines.push(`  - Dimension: 2^${Math.log2(this.dimension)}`);
         lines.push(`  - Length: 2^${Math.log2(this.codewordLength)}`);
-        lines.push(`  - Rate: ${this.rate}`);
-        lines.push(`  - Field Size: 2^${Decimal.floor(this.fieldBits)}`);
-        lines.push("");
-
-        lines.push("FRI Parameters:");
-        lines.push(`  - Num Functions: ${this.nFunctions}`);
-        lines.push(`  - Folding Factors: [${this.foldingFactors.join(", ")}]`);
-        lines.push(`  - Num Queries: ${this.nQueries}`);
-        lines.push(`  - Query Grinding Bits: ${this.nGrindingBits}`);
-        lines.push("");
-
+        lines.push(`  - Rate: 1/${this.codewordLength / this.dimension}`);
         lines.push(
-            `Total Security: ${b.totalSecurityBits} bits (bottleneck: ${b.bottleneck})`
+            `  - Field Size: 2^${Math.floor(Math.log2(this.fieldSize))}`
         );
         lines.push("");
 
-        if (b.meetsTarget) {
-            lines.push(
-                `✓ Security target of ${b.targetSecurityBits} bits is MET`
-            );
-            const margin = b.totalSecurityBits - b.targetSecurityBits;
-            lines.push(`  Margin: +${margin} bits`);
+        lines.push(this.friCalculator.formatParameters());
+        lines.push("");
+
+        if (this.meetsSecurityTarget()) {
+            lines.push(`Total Security: ${b.totalSecurityBits} bits`);
         } else {
             lines.push(
-                `✗ Security target of ${b.targetSecurityBits} bits is NOT MET`
+                `Total Security: ${b.totalSecurityBits} bits (bottleneck: ${b.bottleneck})`
             );
-            lines.push(`  Deficit: ${b.deficit} bits`);
+        }
+        lines.push("");
+
+        if (b.meetsTarget) {
+            const margin = b.totalSecurityBits - b.targetSecurityBits;
+            lines.push(
+                `✓ Security target of ${b.targetSecurityBits} bits is MET with margin of ${margin} bits`
+            );
+        } else {
+            lines.push(
+                `✗ Security target of ${b.targetSecurityBits} bits is NOT MET with deficit of ${b.deficit} bits`
+            );
             lines.push("");
             lines.push("Recommendations:");
             if (b.bottleneck === "FRI") {
@@ -482,7 +594,7 @@ class SecurityCalculator {
             }
         }
         lines.push(
-            "-------------------------------------------------------------"
+            "-----------------------------------------------------------"
         );
 
         lines.push("Security Breakdown:");
@@ -493,7 +605,7 @@ class SecurityCalculator {
 
         lines.push(this.friCalculator.formatReport());
         lines.push(
-            "============================================================"
+            "==========================================================="
         );
         return lines.join("\n");
     }
@@ -508,56 +620,91 @@ function createSecurityCalculator(regime, params) {
     return new SecurityCalculator({ ...params, regime });
 }
 
+function getOptimalFRIQueryParams(regime, params) {
+    const friCalculator = new FRISecurityCalculator(regime, 
+        {
+            nFunctions: params.nFunctions,
+            foldingFactors: params.foldingFactors,
+            targetSecurityBits: params.targetSecurityBits,
+            maxGrindingBits: params.maxGrindingBits,
+        });
+    return {
+        nQueries: friCalculator.nQueries,
+        nGrindingBits: friCalculator.nGrindingBits,
+    }
+}
+
 module.exports = {
     createSecurityCalculator,
+    getOptimalFRIQueryParams,
 };
-
 
 // Usage example
 if (require.main === module) {
-    const field = 2n ** 64n - 2n ** 32n + 1n; // Goldilocks
+    const field = 2n ** 64n - 2n ** 32n + 1n;
     const extensionDegree = 3n;
     const fieldSize = field ** extensionDegree;
 
-    const calc = createSecurityCalculator("JBR", {
+    const jbr = createSecurityCalculator("JBR", {
+        name: "Example JBR Calculation",
         // Field
         fieldSize,
 
         // Code parameters
-        dimension: 2 ** 20,
-        rate: 1 / 4,
+        dimension: 2 ** 17,
+        rate: 1 / 2,
 
         // Constraints
-        nConstraints: 100,
-        maxConstraintDegree: 8,
-        nOpeningPoints: 3,
+        nConstraints: 2432,
+        maxConstraintDegree: 3,
+        nOpeningPoints: 26,
 
         // FRI
-        nFunctions: 10,
-        foldingFactors: [4, 4, 4, 2],
-        nQueries: 64,
-        nGrindingBits: 16,
+        nFunctions: 4065,
+        foldingFactors: [4, 4, 4],
+        maxGrindingBits: 25,
 
         // Target
         targetSecurityBits: 128,
     });
 
-    console.log(calc.formatReport());
+    console.log(jbr.formatReport());
+
+    const jbr_opt = getOptimalFRIQueryParams(jbr.regime, {
+        nFunctions: 4065,
+        foldingFactors: [4, 4, 4],
+        maxGrindingBits: 25,
+        targetSecurityBits: 128,
+    });
+
+    console.log("Optimal FRI Query Params for JBR:");
+    console.log(jbr_opt);
 
     // Compare with UDR
-    const calcUDR = createSecurityCalculator("UDR", {
+    const udr = createSecurityCalculator("UDR", {
+        name: "Example UDR Calculation",
         fieldSize,
-        dimension: 2 ** 20,
-        rate: 1 / 8,
-        nConstraints: 100,
-        maxConstraintDegree: 8,
-        nOpeningPoints: 3,
-        nFunctions: 10,
-        foldingFactors: [4, 4, 4, 2],
-        nQueries: 64,
+        dimension: 2 ** 17,
+        rate: 1 / 2,
+        nConstraints: 2432,
+        maxConstraintDegree: 3,
+        nOpeningPoints: 26,
+        nFunctions: 4065,
+        foldingFactors: [4, 4, 4],
+        nQueries: 128,
         nGrindingBits: 16,
         targetSecurityBits: 128,
     });
 
-    console.log(calcUDR.formatReport());
+    console.log(udr.formatReport());
+
+    const udr_opt = getOptimalFRIQueryParams(udr.regime, {
+        nFunctions: 4065,
+        foldingFactors: [4, 4, 4],
+        maxGrindingBits: 25,
+        targetSecurityBits: 128,
+    });
+
+    console.log("Optimal FRI Query Params for UDR:");
+    console.log(udr_opt);
 }
