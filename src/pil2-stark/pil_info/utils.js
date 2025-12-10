@@ -1,4 +1,5 @@
 const ProtoOut = require("pil2-compiler/src/proto_out.js");
+const { FIELD_EXTENSION } = require("../../constants.js");
 
 const piloutTypes =  {
     FIXED_COL: 1,
@@ -115,7 +116,7 @@ function formatExpression(exp, pilout, symbols, global = false) {
         const rowOffset = exp[op].rowOffset;
         const stage = exp[op].stage;
         const id = stageId + stageWidths.slice(0, stage - 1).reduce((acc, c) => acc + c, 0);
-        const dim = stage <= 1 ? 1 : 3;
+        const dim = stage <= 1 ? 1 : FIELD_EXTENSION;
         const airgroupId = exp[op].airGroupId;
         const airId = exp[op].airId;
         exp = { op: type, id, stageId, rowOffset, stage, dim, airgroupId, airId };
@@ -135,13 +136,13 @@ function formatExpression(exp, pilout, symbols, global = false) {
     } else if (op === "airGroupValue") {
         const id = exp[op].idx;
         const stage = !global ? pilout.airGroupValues[id].stage : pilout.airGroups[exp[op].airGroupId].airGroupValues[id].stage;
-        const dim = stage === 1 ? 1 : 3; 
+        const dim = stage === 1 ? 1 : FIELD_EXTENSION; 
         exp = { op: "airgroupvalue", id, airgroupId: exp[op].airGroupId, dim, stage };
         store = true;
     } else if (op === "airValue") {
         const id = exp[op].idx;
         const stage = pilout.airValues[id].stage;
-        const dim = stage === 1 ? 1 : 3; 
+        const dim = stage === 1 ? 1 : FIELD_EXTENSION; 
         exp = { op: "airvalue", id, stage, dim };
         store = true;
     } else if (op === "challenge") {
@@ -153,7 +154,7 @@ function formatExpression(exp, pilout, symbols, global = false) {
     } else if (op === "proofValue") {
         const id = exp[op].idx;
         const stage = exp[op].stage;
-        const dim = stage === 1 ? 1 : 3; 
+        const dim = stage === 1 ? 1 : FIELD_EXTENSION; 
         exp = { op: "proofvalue", id, stage, dim};
         store = true;
     } else {
@@ -234,7 +235,7 @@ module.exports.formatSymbols = function formatSymbols(pilout, global = false) {
         .flatMap(s => {
         if(s.type === piloutTypes.CUSTOM_COL && s.stage !== 0) throw new Error("Invalid stage " + s.stage + "for a custom commit");
         if([piloutTypes.FIXED_COL, piloutTypes.WITNESS_COL, piloutTypes.CUSTOM_COL].includes(s.type)) {
-            const dim = ([0,1].includes(s.stage)) ? 1 : 3;
+            const dim = ([0,1].includes(s.stage)) ? 1 : FIELD_EXTENSION;
             const type = s.type === piloutTypes.FIXED_COL ? "fixed" : s.type === piloutTypes.CUSTOM_COL ? "custom" : "witness";
             const previousPols = pilout.symbols.filter(si => si.type === s.type 
                 && si.airId === s.airId && si.airGroupId === s.airGroupId
@@ -269,7 +270,7 @@ module.exports.formatSymbols = function formatSymbols(pilout, global = false) {
                 return multiArraySymbols;
             }
         } else if(s.type === piloutTypes.PROOF_VALUE) {
-            const dim = s.stage === 1 ? 1 : 3; 
+            const dim = s.stage === 1 ? 1 : FIELD_EXTENSION; 
             if(!s.dim) {
                 return {
                     name: s.name,
@@ -291,7 +292,7 @@ module.exports.formatSymbols = function formatSymbols(pilout, global = false) {
                 stageId: s.id,
                 id,
                 stage: s.stage,
-                dim: 3,
+                dim: FIELD_EXTENSION,
             }
         } else if(s.type === piloutTypes.PUBLIC_VALUE) {
             if(!s.dim) {
@@ -315,18 +316,18 @@ module.exports.formatSymbols = function formatSymbols(pilout, global = false) {
                     type: "airgroupvalue",
                     id: s.id,
                     airgroupId: s.airGroupId,
-                    dim: 3,
+                    dim: FIELD_EXTENSION,
                 }
                 if(stage) airgroupValue.stage = stage;
                 return airgroupValue;
             } else {
                 const multiArraySymbols = [];
-                generateMultiArraySymbols(multiArraySymbols, [], s, "airgroupvalue", stage, 3, s.id, 0);
+                generateMultiArraySymbols(multiArraySymbols, [], s, "airgroupvalue", stage, FIELD_EXTENSION, s.id, 0);
                 return multiArraySymbols;
             }
         } else if(s.type === piloutTypes.AIR_VALUE) {
             const stage = pilout.airValues[s.id].stage;
-            const dim = stage != 1 ? 3 : 1
+            const dim = stage != 1 ? FIELD_EXTENSION : 1
             if(!s.dim) {
                 return {
                     name: s.name,

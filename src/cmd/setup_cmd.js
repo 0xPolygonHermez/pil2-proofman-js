@@ -227,6 +227,9 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         };
   
         let finalSettings = { blowupFactor: 4, finalDegree: 10, foldingFactor: 5 };
+        if(!proofManagerConfig.setup.genFinalSnarkSetup) {
+            finalSettings.lastLevelVerification = 3;
+        }
         if(proofManagerConfig.setup && proofManagerConfig.setup.settings && proofManagerConfig.setup.settings.final) {
             finalSettings = proofManagerConfig.setup.settings.final;
         }

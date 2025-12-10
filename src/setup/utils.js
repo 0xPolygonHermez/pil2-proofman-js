@@ -26,7 +26,7 @@ function generateStarkStruct(settings, nBits, useNoConjecture=false) {
     
     let hashCommits = settings.hashCommits || true;
     let blowupFactor = settings.blowupFactor || 1;
-    let nQueries = useNoConjecture ? Math.floor(256 / blowupFactor) : Math.ceil(128 / blowupFactor);
+    let nQueries = useNoConjecture ? Math.floor(230 / blowupFactor) : Math.ceil(128 / blowupFactor);
     if(settings.nQueries > nQueries) nQueries = settings.nQueries;
     let foldingFactor = settings.foldingFactor || 3;
     let finalDegree = settings.finalDegree || 5;
@@ -35,9 +35,11 @@ function generateStarkStruct(settings, nBits, useNoConjecture=false) {
         starkStruct.merkleTreeArity = settings.merkleTreeArity || 16;
         starkStruct.merkleTreeCustom = settings.merkleTreeCustom || false;
         hashCommits = false;
+        starkStruct.lastLevelVerification = 0;
     } else {
         starkStruct.merkleTreeArity = MERKLE_TREE_ARITY;
         starkStruct.merkleTreeCustom = true;
+        starkStruct.lastLevelVerification = settings.lastLevelVerification || 1;
     }
     
     starkStruct.hashCommits = hashCommits;

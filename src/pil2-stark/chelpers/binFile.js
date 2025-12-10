@@ -440,6 +440,7 @@ async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
     verify.push("        n_challenges_total: " + (starkInfo.challengesMap.length + starkInfo.starkStruct.steps.length + 1) + ",");
     verify.push("        fri_steps: vec![" + starkInfo.starkStruct.steps.map(s => s.nBits).join(", ") + "],");
     verify.push("        hash_commits: " + starkInfo.starkStruct.hashCommits + ",");
+    verify.push("        last_level_verification: " + starkInfo.starkStruct.lastLevelVerification + ",");
     let num_vals = [];
     for(let i = 0; i < starkInfo.nStages + 1; ++i) {
         num_vals.push(starkInfo.mapSectionsN[`cm${i + 1}`]);
