@@ -213,7 +213,7 @@ module.exports.genRecursiveSetupTest = async function genRecursiveSetupTest(buil
 
     await fixedCols.saveToFile(`${filesDir}/${nameFile}.const`);
 
-    let starkStructRecursive = generateStarkStruct({blowupFactor: 3}, Math.log2(air.numRows), setupOptions.useNoConjecture);
+    let starkStructRecursive = generateStarkStruct({blowupFactor: 3, lastLevelVerification: 1}, Math.log2(air.numRows));
 
     const setup = await starkSetup(air, starkStructRecursive, {...setupOptions, airgroupId:0, airId:0});
 

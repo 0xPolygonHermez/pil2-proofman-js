@@ -88,6 +88,8 @@ module.exports.addIntermediatePolynomials = function addIntermediatePolynomials(
         symbols.push({ type: "witness", name: `Q${i}`, polId: index, stage, dim: res.qDim, airId: res.airId, airgroupId: res.airgroupId });
         E.cm(index, 0, stage, res.qDim);
     }
+
+    res.nConstraints = constraints.length;
     
 }
 

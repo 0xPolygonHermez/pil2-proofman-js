@@ -11,7 +11,7 @@ const execPromise = util.promisify(exec);
 const tmp = require('os').tmpdir();
 
 
-module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot, starkInfo, verifierInfo, starkInfoFile, useNoConjecture=false) {
+module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot, starkInfo, verifierInfo, starkInfoFile) {
 
     const tempDir = await fs.promises.mkdtemp(path.join(tmp, 'compressor-'));
 

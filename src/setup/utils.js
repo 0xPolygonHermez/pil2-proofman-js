@@ -14,7 +14,7 @@ async function fileExists(path) {
 }
 
 
-function generateStarkStruct(settings, nBits, useNoConjecture=false) {
+function generateStarkStruct(settings, nBits) {
     let starkStruct = {
         nBits,
     };
@@ -26,8 +26,6 @@ function generateStarkStruct(settings, nBits, useNoConjecture=false) {
     
     let hashCommits = settings.hashCommits || true;
     let blowupFactor = settings.blowupFactor || 1;
-    let nQueries = useNoConjecture ? Math.floor(230 / blowupFactor) : Math.ceil(128 / blowupFactor);
-    if(settings.nQueries > nQueries) nQueries = settings.nQueries;
     let foldingFactor = settings.foldingFactor || 3;
     let finalDegree = settings.finalDegree || 5;
     
@@ -39,13 +37,13 @@ function generateStarkStruct(settings, nBits, useNoConjecture=false) {
     } else {
         starkStruct.merkleTreeArity = MERKLE_TREE_ARITY;
         starkStruct.merkleTreeCustom = true;
-        starkStruct.lastLevelVerification = settings.lastLevelVerification || 1;
+        starkStruct.lastLevelVerification = settings.lastLevelVerification || 2;
     }
     
     starkStruct.hashCommits = hashCommits;
     starkStruct.nBitsExt = starkStruct.nBits + blowupFactor;
-    starkStruct.nQueries = nQueries;
     starkStruct.verificationHashType = verificationHashType;
+    starkStruct.grindingBits = settings.grindingBits || 21;
     
     starkStruct.steps = [{nBits: starkStruct.nBitsExt}];
     let friStepBits = starkStruct.nBitsExt;

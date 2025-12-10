@@ -89,7 +89,7 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
         throw new Error("Final starkStruct nBits does not match with vadcop final circuit size");
     };
 
-    let starkStructFinal = finalSettings.starkStruct || generateStarkStruct(finalSettings, nBits, setupOptions.useNoConjecture);
+    let starkStructFinal = finalSettings.starkStruct || generateStarkStruct(finalSettings, nBits);
     
     // Build stark info
     const airout = new AirOut(pilFile);

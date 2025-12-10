@@ -162,7 +162,8 @@ class FRISecurityCalculator {
         } else if (params.maxGrindingBits !== undefined) {
             const optimal = this._calculateOptimalQueryParams(
                 this.targetSecurityBits,
-                params.maxGrindingBits
+                params.maxGrindingBits,
+                params.useMaxGrindingBits
             );
             this.nQueries = optimal.nQueries;
             this.nGrindingBits = optimal.nGrindingBits;
@@ -196,7 +197,7 @@ class FRISecurityCalculator {
         return totalHashes;
     }
 
-    _calculateOptimalQueryParams(targetSecurityBits, maxGrindingBits) {
+    _calculateOptimalQueryParams(targetSecurityBits, maxGrindingBits, useMaxGrindingBits) {
         // Security bits per query
         const singleQueryError = this.calculateSingleQueryError();
         const bitsPerQuery = -Math.log2(singleQueryError);
@@ -214,7 +215,7 @@ class FRISecurityCalculator {
         // Find max grinding where grinding is still cheaper than one query
         // 2^g < hashesPerQuery  =>  g < log2(hashesPerQuery)
         const maxEfficientGrinding = Math.floor(Math.log2(hashesPerQuery));
-        const nGrindingBits = Math.min(maxEfficientGrinding, maxGrindingBits);
+        const nGrindingBits = useMaxGrindingBits ? maxGrindingBits : Math.min(maxEfficientGrinding, maxGrindingBits);
 
         const neededFromQueries = targetSecurityBits - nGrindingBits;
         const nQueries = neededFromQueries > 0 
@@ -437,6 +438,8 @@ class SecurityCalculator {
             nQueries: this.nQueries,
             nGrindingBits: this.nGrindingBits,
             maxGrindingBits: params.maxGrindingBits,
+            useMaxGrindingBits: params.useMaxGrindingBits,
+            treeArity: params.treeArity,
         });
 
         // Target
@@ -620,14 +623,37 @@ function createSecurityCalculator(regime, params) {
     return new SecurityCalculator({ ...params, regime });
 }
 
-function getOptimalFRIQueryParams(regime, params) {
+function getOptimalFRIQueryParams(name, params) {
+    
+    let augmentedDimension = params.dimension + params.nOpeningPoints;
+    const regimeParams = {
+        fieldSize: new Decimal(params.fieldSize),
+        dimension: params.dimension + params.nOpeningPoints,
+        rate: params.rate * (augmentedDimension / params.dimension),
+    };
+    
+    let regime;
+    if (name === "JBR") {
+        regime = new JBR(regimeParams);
+    } else if (name === "UDR") {
+        regime = new UDR(regimeParams);
+    } else {
+        throw new Error(
+            `Unknown decoding regime: ${params.regime}. Supported regimes are "JBR" and "UDR".`
+        );
+    }
+
     const friCalculator = new FRISecurityCalculator(regime, 
         {
             nFunctions: params.nFunctions,
             foldingFactors: params.foldingFactors,
             targetSecurityBits: params.targetSecurityBits,
             maxGrindingBits: params.maxGrindingBits,
+            useMaxGrindingBits: params.useMaxGrindingBits,
+            treeArity: params.treeArity,
         });
+
+
     return {
         nQueries: friCalculator.nQueries,
         nGrindingBits: friCalculator.nGrindingBits,
@@ -645,14 +671,13 @@ if (require.main === module) {
     const extensionDegree = 3n;
     const fieldSize = field ** extensionDegree;
 
-    const jbr = createSecurityCalculator("JBR", {
-        name: "Example JBR Calculation",
+    const params = {
         // Field
         fieldSize,
 
         // Code parameters
         dimension: 2 ** 17,
-        rate: 1 / 2,
+        rate: new Decimal(1 / 2),
 
         // Constraints
         nConstraints: 2432,
@@ -662,49 +687,29 @@ if (require.main === module) {
         // FRI
         nFunctions: 4065,
         foldingFactors: [4, 4, 4],
-        maxGrindingBits: 25,
+        maxGrindingBits: 21,
+        useMaxGrindingBits: true,
+
+        treeArity: 4,
 
         // Target
         targetSecurityBits: 128,
-    });
+    };
+
+    const jbr = createSecurityCalculator("JBR", params);
 
     console.log(jbr.formatReport());
 
-    const jbr_opt = getOptimalFRIQueryParams(jbr.regime, {
-        nFunctions: 4065,
-        foldingFactors: [4, 4, 4],
-        maxGrindingBits: 25,
-        targetSecurityBits: 128,
-    });
-
     console.log("Optimal FRI Query Params for JBR:");
-    console.log(jbr_opt);
+    console.log("Number of Grindings: ", jbr.friCalculator.nGrindingBits);
+    console.log("Number of Queries: ", jbr.friCalculator.nQueries);
 
     // Compare with UDR
-    const udr = createSecurityCalculator("UDR", {
-        name: "Example UDR Calculation",
-        fieldSize,
-        dimension: 2 ** 17,
-        rate: 1 / 2,
-        nConstraints: 2432,
-        maxConstraintDegree: 3,
-        nOpeningPoints: 26,
-        nFunctions: 4065,
-        foldingFactors: [4, 4, 4],
-        nQueries: 128,
-        nGrindingBits: 16,
-        targetSecurityBits: 128,
-    });
+    const udr = createSecurityCalculator("UDR", params);
 
     console.log(udr.formatReport());
 
-    const udr_opt = getOptimalFRIQueryParams(udr.regime, {
-        nFunctions: 4065,
-        foldingFactors: [4, 4, 4],
-        maxGrindingBits: 25,
-        targetSecurityBits: 128,
-    });
-
     console.log("Optimal FRI Query Params for UDR:");
-    console.log(udr_opt);
+    console.log("Number of Grindings: ", udr.friCalculator.nGrindingBits);
+    console.log("Number of Queries: ", udr.friCalculator.nQueries);
 }
