@@ -97,17 +97,18 @@ class JBR extends DecodingRegime {
         return 1 - this.sqrtRate;
     }
 
+    get minDecodingRadius() {
+        return (1 - this.rate) / 2;
+    }
+
     get proximityParameter() {
         // How close we are to the Johnson Bound 1-sqrt(rate)
 
         // TODO: Let's use a heuristic to figure out the proximity parameter here.
-        const correction =
-            this.fieldSize >= 1n << 150n
-                ? 1 / this.codewordLength
-                : this.rate / 20;
-
+        const correction = 1 / 120;
+        
         const pp = this.maxDecodingRadius - correction;
-        assert(pp > 0, "Proximity parameter must be positive in JBR");
+        assert(pp >= this.minDecodingRadius, "Proximity parameter must be positive in JBR");
         return pp;
     }
 
@@ -300,6 +301,14 @@ class FRISecurityCalculator {
         const batchCommitError = this.calculateBatchCommitError();
         const queryError = this.calculateQueryPhaseError();
         return Decimal.max(batchCommitError, queryError);
+    }
+
+    calculateTotalSecurityBits() {
+        return get_security_from_error(this.calculateTotalError());
+    }
+
+    meetsSecurityTarget() {
+        return this.calculateTotalSecurityBits() >= this.targetSecurityBits;
     }
 
     /**
@@ -653,7 +662,12 @@ function getOptimalFRIQueryParams(name, params) {
             treeArity: params.treeArity,
         });
 
-
+    if (!friCalculator.meetsSecurityTarget()) {
+        console.log(friCalculator.formatReport());
+        throw new Error(
+            `The given parameters do not meet the security target.`
+        );
+    }
     return {
         nQueries: friCalculator.nQueries,
         nGrindingBits: friCalculator.nGrindingBits,
