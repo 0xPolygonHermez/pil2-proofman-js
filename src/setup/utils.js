@@ -34,16 +34,18 @@ function generateStarkStruct(settings, nBits) {
         starkStruct.merkleTreeCustom = settings.merkleTreeCustom || false;
         hashCommits = false;
         starkStruct.lastLevelVerification = 0;
+        starkStruct.powBits = 0;
     } else {
         starkStruct.merkleTreeArity = MERKLE_TREE_ARITY;
         starkStruct.merkleTreeCustom = true;
         starkStruct.lastLevelVerification = settings.lastLevelVerification || 2;
+        starkStruct.powBits = settings.powBits || 21;
     }
     
     starkStruct.hashCommits = hashCommits;
     starkStruct.nBitsExt = starkStruct.nBits + blowupFactor;
     starkStruct.verificationHashType = verificationHashType;
-    starkStruct.grindingBits = settings.grindingBits || 21;
+   
     
     starkStruct.steps = [{nBits: starkStruct.nBitsExt}];
     let friStepBits = starkStruct.nBitsExt;

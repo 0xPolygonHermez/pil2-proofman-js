@@ -18,7 +18,7 @@ module.exports.starkSetup = async function starkSetup(pil, starkStruct, options)
             if (i === arr.length - 1) return null; 
             return arr[i].nBits - arr[i + 1].nBits;
         }).filter(v => v !== null),
-        maxGrindingBits: starkStruct.grindingBits,
+        maxGrindingBits: starkStruct.powBits,
         targetSecurityBits: 128,
         useMaxGrindingBits: true,
         treeArity: starkStruct.merkleTreeArity,
