@@ -39,7 +39,7 @@ function generateStarkStruct(settings, nBits) {
         starkStruct.merkleTreeArity = MERKLE_TREE_ARITY;
         starkStruct.merkleTreeCustom = true;
         starkStruct.lastLevelVerification = settings.lastLevelVerification || 2;
-        starkStruct.powBits = settings.powBits || 21;
+        starkStruct.powBits = settings.powBits || 19;
     }
     
     starkStruct.hashCommits = hashCommits;

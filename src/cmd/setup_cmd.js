@@ -71,6 +71,10 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
                 throw new Error(`[${this.name}] No settings for air '${air.name}'${air.numRows ? ` with N=${air.numRows}` : ''}`);
             }
 
+            if (!settings.powBits) {
+                settings.powBits = 16;
+            }
+
             const filesDir = path.join(buildDir, "provingKey", airout.name, airgroup.name, "airs", `${air.name}`, "air");
             await fs.promises.mkdir(filesDir, { recursive: true });
 
@@ -224,7 +228,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         // }
         };
   
-        let finalSettings = { blowupFactor: 4, finalDegree: 10, foldingFactor: 5 };
+        let finalSettings = { blowupFactor: 4, finalDegree: 10, foldingFactor: 5, powBits: 21 };
         if(!proofManagerConfig.setup.genFinalSnarkSetup) {
             finalSettings.lastLevelVerification = 3;
         }
@@ -235,7 +239,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         const {starkInfoFinal,
             constRootFinal,
             verifierInfoFinal,
-        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 59);
+        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 62);
         
         if(proofManagerConfig.setup.genFinalSnarkSetup) {
             await genFinalSnarkSetup(

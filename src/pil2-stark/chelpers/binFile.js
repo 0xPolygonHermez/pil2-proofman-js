@@ -411,7 +411,7 @@ async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
     let {verifyRust: verifyFRIRust} = getParserArgs(starkInfo, operations, verifierInfo.queryVerifier, [], false, true);
  
     let verifierRust = [];
-    verifierRust.push("use fields::{Goldilocks, CubicExtensionField, Field};");
+    verifierRust.push(`use fields::{Goldilocks, CubicExtensionField, Field, Poseidon${starkInfo.merkleTreeArity * 4}};`);
     verifierRust.push("use crate::{Boundary, VerifierInfo, stark_verify};\n");
     verifyQRust.unshift("pub fn q_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], _publics: &[Goldilocks], zi: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
     verifyQRust.unshift("#[allow(clippy::all)]");
@@ -475,7 +475,7 @@ async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
     verify.push("} else {");
     verify.push("    proof");
     verify.push("};");
-    verify.push("    stark_verify(proof_data, vk, &verifier_info(), q_verify, query_verify)");
+    verify.push(`    stark_verify::<Poseidon${starkInfo.starkStruct.merkleTreeArity * 4}, ${starkInfo.starkStruct.merkleTreeArity * 4}>(proof_data, vk, &verifier_info(), q_verify, query_verify)`);
     verify.push("}\n");
 
     verifierRust.push(...verify);

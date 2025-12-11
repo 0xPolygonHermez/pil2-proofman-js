@@ -30,6 +30,10 @@ module.exports.starkSetup = async function starkSetup(pil, starkStruct, options)
 
     starkInfo.starkStruct.nQueries = fri_security.nQueries;
     starkInfo.starkStruct.powBits = fri_security.nGrindingBits;
+    starkInfo.security = {
+        proximityParameter: fri_security.proximityParameter,
+        regime: "JBR",
+    };
 
     const res = {
         starkInfo,

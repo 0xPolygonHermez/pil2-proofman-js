@@ -15,6 +15,7 @@ class DecodingRegime {
         this.dimension = params.dimension;
         this.rate = params.rate;
         this.codewordLength = this.dimension / this.rate;
+        this.alpha = params.alpha || 0;
     }
 
     get name() {
@@ -105,10 +106,9 @@ class JBR extends DecodingRegime {
         // How close we are to the Johnson Bound 1-sqrt(rate)
 
         // TODO: Let's use a heuristic to figure out the proximity parameter here.
-        const correction = 1 / 120;
-        
-        const pp = this.maxDecodingRadius - correction;
-        assert(pp >= this.minDecodingRadius, "Proximity parameter must be positive in JBR");
+        const baseCorrection = 1 / 300;
+        const correction = baseCorrection * (1 + this.alpha);
+        const pp = Math.max(this.maxDecodingRadius - correction, this.minDecodingRadius);
         return pp;
     }
 
@@ -160,6 +160,7 @@ class FRISecurityCalculator {
         if (params.nQueries !== undefined) {
             this.nQueries = params.nQueries;
             this.nGrindingBits = params.nGrindingBits ?? 0;
+            this.proximityParameter = regime.proximityParameter;
         } else if (params.maxGrindingBits !== undefined) {
             const optimal = this._calculateOptimalQueryParams(
                 this.targetSecurityBits,
@@ -168,6 +169,7 @@ class FRISecurityCalculator {
             );
             this.nQueries = optimal.nQueries;
             this.nGrindingBits = optimal.nGrindingBits;
+            this.proximityParameter = regime.proximityParameter;
         } else {
             throw new Error("Must provide either nQueries or maxGrindingBits");
         }
@@ -418,6 +420,7 @@ class SecurityCalculator {
             fieldSize: this.fieldSize,
             dimension: this.augmentedDimension,
             rate: this.augmentedRate,
+            nFunctions: params.nFunctions,
         };
 
         if (params.regime === "JBR") {
@@ -634,44 +637,48 @@ function createSecurityCalculator(regime, params) {
 
 function getOptimalFRIQueryParams(name, params) {
     
+    let securityAchieved = false;
+
     let augmentedDimension = params.dimension + params.nOpeningPoints;
-    const regimeParams = {
-        fieldSize: new Decimal(params.fieldSize),
-        dimension: params.dimension + params.nOpeningPoints,
-        rate: params.rate * (augmentedDimension / params.dimension),
-    };
-    
-    let regime;
-    if (name === "JBR") {
-        regime = new JBR(regimeParams);
-    } else if (name === "UDR") {
-        regime = new UDR(regimeParams);
-    } else {
-        throw new Error(
-            `Unknown decoding regime: ${params.regime}. Supported regimes are "JBR" and "UDR".`
-        );
-    }
+    let fieldSize = new Decimal(params.fieldSize);
+    let rate = params.rate * (augmentedDimension / params.dimension);
 
-    const friCalculator = new FRISecurityCalculator(regime, 
-        {
-            nFunctions: params.nFunctions,
-            foldingFactors: params.foldingFactors,
-            targetSecurityBits: params.targetSecurityBits,
-            maxGrindingBits: params.maxGrindingBits,
-            useMaxGrindingBits: params.useMaxGrindingBits,
-            treeArity: params.treeArity,
-        });
+    let alpha = 0;
+    let nQueries, nGrindingBits, proximityParameter;
+    while (!securityAchieved) {
+        const regimeParams = { fieldSize, dimension: augmentedDimension, rate, alpha};
+        
+        let regime;
+        if (name === "JBR") {
+            regime = new JBR(regimeParams);
+        } else if (name === "UDR") {
+            regime = new UDR(regimeParams);
+        } else {
+            throw new Error(
+                `Unknown decoding regime: ${params.regime}. Supported regimes are "JBR" and "UDR".`
+            );
+        }
 
-    if (!friCalculator.meetsSecurityTarget()) {
-        console.log(friCalculator.formatReport());
-        throw new Error(
-            `The given parameters do not meet the security target.`
-        );
+        const friCalculator = new FRISecurityCalculator(regime, 
+            {
+                nFunctions: params.nFunctions,
+                foldingFactors: params.foldingFactors,
+                targetSecurityBits: params.targetSecurityBits,
+                maxGrindingBits: params.maxGrindingBits,
+                useMaxGrindingBits: params.useMaxGrindingBits,
+                treeArity: params.treeArity,
+            });
+
+        if (!friCalculator.meetsSecurityTarget()) {
+            alpha += 0.1;
+        } else {
+            securityAchieved = true;
+            nQueries = friCalculator.nQueries;
+            nGrindingBits = friCalculator.nGrindingBits;
+            proximityParameter = friCalculator.proximityParameter;
+        }
     }
-    return {
-        nQueries: friCalculator.nQueries,
-        nGrindingBits: friCalculator.nGrindingBits,
-    }
+    return { nQueries, nGrindingBits, proximityParameter }
 }
 
 module.exports = {
@@ -717,6 +724,7 @@ if (require.main === module) {
     console.log("Optimal FRI Query Params for JBR:");
     console.log("Number of Grindings: ", jbr.friCalculator.nGrindingBits);
     console.log("Number of Queries: ", jbr.friCalculator.nQueries);
+    console.log("Proximity Parameter: ", jbr.regime.proximityParameter);
 
     // Compare with UDR
     const udr = createSecurityCalculator("UDR", params);

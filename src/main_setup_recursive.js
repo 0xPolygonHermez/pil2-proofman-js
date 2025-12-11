@@ -28,8 +28,8 @@ async function run() {
     
     // Validate and set nCols
     const nCols = argv.nCols || 59;
-    if (nCols !== 59 && nCols !== 42 && nCols !== 12) {
-        throw new Error("nCols must be either 59 or 42 or 12");
+    if (nCols !== 59 && nCols !== 62 && nCols !== 12) {
+        throw new Error("nCols must be either 59 or 62 or 12");
     }
 
     await fs.promises.mkdir(buildDir, { recursive: true });
