@@ -19,8 +19,9 @@ const compilePil2 = require("pil2-compiler/src/compiler.js");
 const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
 const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
 const { writeFixedPolsBin, readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
+const tmp = require('os').tmpdir();
 
-module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, setupOptions, template, airGroupName, airgroupId, airId, globalInfo, constRoot, verificationKeys = [], starkInfo, verifierInfo, starkStruct, compressorCols, hasCompressor) {
+module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, setupOptions, template, airGroupName, airgroupId, airId, globalInfo, constRootC, verificationKeys = [], starkInfo, verifierInfo, starkStruct, compressorCols, hasCompressor, setupAggregation_) {
 
     let inputChallenges = false;
     let verkeyInput = false;
@@ -29,9 +30,11 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
     let templateFilename;
     let nameFilename;
     let filesDir;
-    let constRootCircuit = constRoot || [];
+    let constRootCircuit = constRootC || [];
+    let airgroupPilName;
     if((template === "recursive1" && !hasCompressor) || template === "compressor") {
         let airName = globalInfo.airs[airgroupId][airId].name;
+        airgroupPilName = `${airGroupName}_${airName}_${template}`;
         inputChallenges = true;
         verifierName = `${airName}.verifier.circom`;
         nameFilename = `${airName}_${template}`;    
@@ -39,11 +42,13 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
         filesDir = `${buildDir}/provingKey/${globalInfo.name}/${airGroupName}/airs/${airName}/${template}`;
     } else if(template === "recursive1") {
         let airName = globalInfo.airs[airgroupId][airId].name;
+        airgroupPilName = `${airGroupName}_${airName}_${template}`;
         verifierName = `${airName}_compressor.verifier.circom`;
         nameFilename = `${airName}_${template}`;
         templateFilename = path.resolve(__dirname,"../../", `node_modules/stark-recurser/src/vadcop/templates/recursive1.circom.ejs`);
         filesDir = `${buildDir}/provingKey/${globalInfo.name}/${airGroupName}/airs/${airName}/recursive1/`;
     } else if (template === "recursive2") {
+        airgroupPilName = `Recursive2`;
         verifierName = `${airGroupName}_recursive2.verifier.circom`;
         nameFilename = `${airGroupName}_${template}`;
         templateFilename =  path.resolve(__dirname,"../../", `node_modules/stark-recurser/src/vadcop/templates/recursive2.circom.ejs`);
@@ -84,7 +89,7 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
     // Generate witness library
     runWitnessLibraryGeneration(buildDir, filesDir, nameFilename, template);
 
-    let recurserOptions = {};
+    let recurserOptions = { airgroupName: airgroupPilName };
     if (template === "compressor") {
         recurserOptions.maxConstraintDegree = 5;
     }
@@ -97,7 +102,7 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
     await fs.promises.writeFile(`${buildDir}/pil/${nameFilename}.pil`, pilStr, "utf8");
 
     let pilFile = `${buildDir}/build/${nameFilename}.pilout`;
-    let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath] };
+    let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath, path.resolve(__dirname, '../../', 'node_modules/stark-recurser/src/circom2pil/pil')] };
     const F = new ffjavascript.F1Field((1n<<64n)-(1n<<32n)+1n );
     compilePil2(F, `${buildDir}/pil/${nameFilename}.pil`, null, pilConfig);
 
@@ -116,41 +121,50 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
 
     await fixedCols.saveToFile(`${filesDir}/${template}.const`);
 
-    const setup = await starkSetup(air, starkStruct, {...setupOptions, airgroupId, airId});
-
-    await fs.promises.writeFile(`${filesDir}/${template}.starkinfo.json`, JSON.stringify(setup.starkInfo, null, 1), "utf8");
-
-    await fs.promises.writeFile(`${filesDir}/${template}.verifierinfo.json`, JSON.stringify(setup.verifierInfo, null, 1), "utf8");
-
-    await fs.promises.writeFile(`${filesDir}/${template}.expressionsinfo.json`, JSON.stringify(setup.expressionsInfo, null, 1), "utf8");
+    let setupAggregation;
+    if (!setupAggregation_) {
+        setupAggregation = await starkSetup(air, starkStruct, {...setupOptions, airgroupId, airId});        
+    } else {
+        setupAggregation = setupAggregation_;
+    }
 
     console.log("Computing Constant Tree...");
-    await exec(`${setupOptions.constTree} -c ${filesDir}/${template}.const -s ${filesDir}/${template}.starkinfo.json -v ${filesDir}/${template}.verkey.json`);
-    setup.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/${template}.verkey.json`, "utf8"));
+    const tempDir = await fs.promises.mkdtemp(path.join(tmp, 'stark-info-'));
+    const tmpStarkInfoFilename = path.join(tempDir, "stark_info.json");
+    await fs.promises.writeFile(tmpStarkInfoFilename, JSON.stringify(setupAggregation.starkInfo, null, 1));
+    await exec(`${setupOptions.constTree} -c ${filesDir}/${template}.const -s ${tmpStarkInfoFilename} -v ${filesDir}/${template}.verkey.json`);
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+    let constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/${template}.verkey.json`, "utf8"));
     
     const constRootBuffer = Buffer.alloc(32);
     for (let i = 0; i < 4; i++) {
-        constRootBuffer.writeBigUInt64LE(setup.constRoot[i], i * 8);
+        constRootBuffer.writeBigUInt64LE(constRoot[i], i * 8);
     }
     await fs.promises.writeFile(`${filesDir}/${template}.verkey.bin`, constRootBuffer);
-   
-    const { stdout: stdout2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.expressionsinfo.json -b ${filesDir}/${template}.bin`);
-    console.log(stdout2);
-
-    const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.verifierinfo.json -b ${filesDir}/${template}.verifier.bin --verifier`);
-    console.log(stdout3);
     
-    writeVerifierRustFile(`${filesDir}/${template}.verifier.rs`, setup.starkInfo, setup.verifierInfo, setup.constRoot);
+    if(template !== "recursive1") {
+        await fs.promises.writeFile(`${filesDir}/${template}.starkinfo.json`, JSON.stringify(setupAggregation.starkInfo, null, 1), "utf8");
+        await fs.promises.writeFile(`${filesDir}/${template}.verifierinfo.json`, JSON.stringify(setupAggregation.verifierInfo, null, 1), "utf8");
+        await fs.promises.writeFile(`${filesDir}/${template}.expressionsinfo.json`, JSON.stringify(setupAggregation.expressionsInfo, null, 1), "utf8");
+
+        const { stdout: stdout2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.expressionsinfo.json -b ${filesDir}/${template}.bin`);
+        console.log(stdout2);
+
+        const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.verifierinfo.json -b ${filesDir}/${template}.verifier.bin --verifier`);
+        console.log(stdout3);
+        
+        writeVerifierRustFile(`${filesDir}/${template}.verifier.rs`, setupAggregation.starkInfo, setupAggregation.verifierInfo, constRoot);
+    }
 
     if(template === "recursive2") {
         const vks = {
             rootCRecursives1: verificationKeys,
-            rootCRecursive2: setup.constRoot,
+            rootCRecursive2: constRoot,
         }
         await fs.promises.writeFile(`${filesDir}/${template}.vks.json`, JSONbig.stringify(vks, 0, 1), "utf8");
     }
 
-    return { constRoot: setup.constRoot, starkInfo: setup.starkInfo, verifierInfo: setup.verifierInfo, pil: pilStr }
+    return { constRoot, pil: pilStr, setupAggregation }
 
 }
 

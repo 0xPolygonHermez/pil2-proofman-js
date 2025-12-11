@@ -708,7 +708,7 @@ if (require.main === module) {
         // FRI
         nFunctions: 4065,
         foldingFactors: [4, 4, 4],
-        maxGrindingBits: 21,
+        maxGrindingBits: 22,
         useMaxGrindingBits: true,
 
         treeArity: 4,
@@ -734,4 +734,10 @@ if (require.main === module) {
     console.log("Optimal FRI Query Params for UDR:");
     console.log("Number of Grindings: ", udr.friCalculator.nGrindingBits);
     console.log("Number of Queries: ", udr.friCalculator.nQueries);
+
+    const fri_security = getOptimalFRIQueryParams("JBR", params);
+    console.log("Optimal FRI Query Params for JBR:");
+    console.log("Number of Grindings: ", fri_security.nGrindingBits);
+    console.log("Number of Queries: ", fri_security.nQueries);
+    console.log("Proximity Parameter: ", fri_security.proximityParameter);
 }

@@ -76,7 +76,7 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
     await fs.promises.writeFile(pilFilename, pilStr, "utf8");
 
     let pilFile = `${buildDir}/build/${nameFilename}.pilout`;
-    let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath] };
+    let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath, path.resolve(__dirname, '../../', 'node_modules/stark-recurser/src/circom2pil/pil')] };
     const F = new ffjavascript.F1Field((1n<<64n)-(1n<<32n)+1n );
     compilePil2(F, pilFilename, null, pilConfig);
 

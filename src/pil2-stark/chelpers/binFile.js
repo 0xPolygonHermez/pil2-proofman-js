@@ -411,7 +411,7 @@ async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
     let {verifyRust: verifyFRIRust} = getParserArgs(starkInfo, operations, verifierInfo.queryVerifier, [], false, true);
  
     let verifierRust = [];
-    verifierRust.push(`use fields::{Goldilocks, CubicExtensionField, Field, Poseidon${starkInfo.merkleTreeArity * 4}};`);
+    verifierRust.push(`use fields::{Goldilocks, CubicExtensionField, Field, Poseidon${starkInfo.starkStruct.merkleTreeArity * 4}};`);
     verifierRust.push("use crate::{Boundary, VerifierInfo, stark_verify};\n");
     verifyQRust.unshift("pub fn q_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], _publics: &[Goldilocks], zi: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
     verifyQRust.unshift("#[allow(clippy::all)]");
