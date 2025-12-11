@@ -2,7 +2,6 @@ const fs = require("fs");
 const version = require("../package").version;
 const path = require("path");
 
-const { generateStarkStruct } = require("./setup/utils");
 const { genRecursiveSetupTest } = require("./setup/generateRecursiveSetup");
 
 const argv = require("yargs")
