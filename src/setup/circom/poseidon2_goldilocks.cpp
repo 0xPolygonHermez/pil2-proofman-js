@@ -7,7 +7,6 @@
 #ifdef __AVX2__
     #include <immintrin.h>
 #endif
-// #include "circom.hpp"
 
 #define WIDTH 16
 
@@ -88,7 +87,7 @@ inline void matmul_external_(Goldilocks::Element *x) {
 #ifdef __AVX2__
 const __m256i zero = _mm256_setzero_si256();
 
-inline void add_avx_small(__m256i st[], const Goldilocks::Element C_small[], size_t width)
+inline void add_avx_small(__m256i st[], const Goldilocks::Element C_small[])
 {
     size_t num_vectors = WIDTH / 4;
     for (size_t i = 0; i < num_vectors; i++)
@@ -101,29 +100,73 @@ inline void add_avx_small(__m256i st[], const Goldilocks::Element C_small[], siz
 
 inline void matmul_external_avx(__m256i st[])
 {
-    const __m256i zero = _mm256_setzero_si256();
+    assert(WIDTH == 12 || WIDTH == 16);
+# if WIDTH == 12 
+    __m256i t0_ = _mm256_permute2f128_si256(st[0], st[2], 0b00100000);
+    __m256i t1_ = _mm256_permute2f128_si256(st[1], zero, 0b00100000);
+    __m256i t2_ = _mm256_permute2f128_si256(st[0], st[2], 0b00110001);
+    __m256i t3_ = _mm256_permute2f128_si256(st[1], zero, 0b00110001);
+    __m256i x0 = _mm256_castpd_si256(_mm256_unpacklo_pd(_mm256_castsi256_pd(t0_), _mm256_castsi256_pd(t1_)));
+    __m256i x1 = _mm256_castpd_si256(_mm256_unpackhi_pd(_mm256_castsi256_pd(t0_), _mm256_castsi256_pd(t1_)));
+    __m256i x2 = _mm256_castpd_si256(_mm256_unpacklo_pd(_mm256_castsi256_pd(t2_), _mm256_castsi256_pd(t3_)));
+    __m256i x3 = _mm256_castpd_si256(_mm256_unpackhi_pd(_mm256_castsi256_pd(t2_), _mm256_castsi256_pd(t3_)));
+#else
+    __m256i t0_ = _mm256_permute2f128_si256(st[0], st[2], 0b00100000);
+    __m256i t1_ = _mm256_permute2f128_si256(st[1], st[3], 0b00100000);
+    __m256i t2_ = _mm256_permute2f128_si256(st[0], st[2], 0b00110001);
+    __m256i t3_ = _mm256_permute2f128_si256(st[1], st[3], 0b00110001);
+    __m256i x0 = _mm256_castpd_si256(_mm256_unpacklo_pd(_mm256_castsi256_pd(t0_), _mm256_castsi256_pd(t1_)));
+    __m256i x1 = _mm256_castpd_si256(_mm256_unpackhi_pd(_mm256_castsi256_pd(t0_), _mm256_castsi256_pd(t1_)));
+    __m256i x2 = _mm256_castpd_si256(_mm256_unpacklo_pd(_mm256_castsi256_pd(t2_), _mm256_castsi256_pd(t3_)));
+    __m256i x3 = _mm256_castpd_si256(_mm256_unpackhi_pd(_mm256_castsi256_pd(t2_), _mm256_castsi256_pd(t3_)));
+#endif
 
-    __m256i t_low[WIDTH/2], t_high[WIDTH/2];
-    for (size_t i = 0; i < WIDTH/2; i++) {
-        t_low[i]  = _mm256_castpd_si256(_mm256_unpacklo_pd(
-                        _mm256_castsi256_pd(st[2*i]),
-                        _mm256_castsi256_pd(st[2*i+1])));
-        t_high[i] = _mm256_castpd_si256(_mm256_unpackhi_pd(
-                        _mm256_castsi256_pd(st[2*i]),
-                        _mm256_castsi256_pd(st[2*i+1])));
+   __m256i t0, t0_2, t1, t1_2, t2, t3, t4, t5, t6, t7;
+    Goldilocks::add_avx(t0, x0, x1);
+    Goldilocks::add_avx(t1, x2, x3);
+    Goldilocks::add_avx(t2, x1, x1);
+    Goldilocks::add_avx(t2, t2, t1);
+    Goldilocks::add_avx(t3, x3, x3);
+    Goldilocks::add_avx(t3, t3, t0);
+    Goldilocks::add_avx(t1_2, t1, t1);
+    Goldilocks::add_avx(t0_2, t0, t0);
+    Goldilocks::add_avx(t4, t1_2, t1_2);
+    Goldilocks::add_avx(t4, t4, t3);
+    Goldilocks::add_avx(t5, t0_2, t0_2);
+    Goldilocks::add_avx(t5, t5, t2);
+    Goldilocks::add_avx(t6, t3, t5);
+    Goldilocks::add_avx(t7, t2, t4);
+
+#if SPONGE_WIDTH == 12
+    t0_ = _mm256_castpd_si256(_mm256_unpacklo_pd(_mm256_castsi256_pd(t6), _mm256_castsi256_pd(t5)));
+    t1_ = _mm256_castpd_si256(_mm256_unpackhi_pd(_mm256_castsi256_pd(t6), _mm256_castsi256_pd(t5)));
+    t2_ = _mm256_castpd_si256(_mm256_unpacklo_pd(_mm256_castsi256_pd(t7), _mm256_castsi256_pd(t4)));
+    t3_ = _mm256_castpd_si256(_mm256_unpackhi_pd(_mm256_castsi256_pd(t7), _mm256_castsi256_pd(t4)));
+
+    // Step 2: Reverse _mm256_permute2f128_si256
+    st[0] = _mm256_permute2f128_si256(t0_, t2_, 0b00100000); // Combine low halves
+    st[2] = _mm256_permute2f128_si256(t0_, t2_, 0b00110001); // Combine high halves
+    st[1] = _mm256_permute2f128_si256(t1_, t3_, 0b00100000); // Combine low halves
+#else
+    t0_ = _mm256_castpd_si256(_mm256_unpacklo_pd(_mm256_castsi256_pd(t6), _mm256_castsi256_pd(t5)));
+    t1_ = _mm256_castpd_si256(_mm256_unpackhi_pd(_mm256_castsi256_pd(t6), _mm256_castsi256_pd(t5)));
+    t2_ = _mm256_castpd_si256(_mm256_unpacklo_pd(_mm256_castsi256_pd(t7), _mm256_castsi256_pd(t4)));
+    t3_ = _mm256_castpd_si256(_mm256_unpackhi_pd(_mm256_castsi256_pd(t7), _mm256_castsi256_pd(t4)));
+
+    // Step 2: Reverse _mm256_permute2f128_si256
+    st[0] = _mm256_permute2f128_si256(t0_, t2_, 0b00100000); // Combine low halves
+    st[2] = _mm256_permute2f128_si256(t0_, t2_, 0b00110001); // Combine high halves
+    st[1] = _mm256_permute2f128_si256(t1_, t3_, 0b00100000); // Combine low halves
+    st[3] = _mm256_permute2f128_si256(t1_, t3_, 0b00110001); // Combine high halves
+#endif
+
+    __m256i stored;
+    Goldilocks::add_avx(stored, st[0], st[1]);
+    for(int i = 2; i < (WIDTH >> 2); i++) {
+        Goldilocks::add_avx(stored, stored, st[i]);            
     }
 
-    __m256i temp[WIDTH];
-    for (size_t i = 0; i < WIDTH/2; i++) {
-        Goldilocks::add_avx(temp[i], t_low[i], t_high[i]);
-    }
-
-    __m256i stored = _mm256_setzero_si256();
-    for (size_t i = 0; i < WIDTH; i++) {
-        Goldilocks::add_avx(stored, stored, st[i]);
-    }
-
-    for (size_t i = 0; i < WIDTH; i++) {
+    for(int i = 0; i < (WIDTH >> 2); i++) {
         Goldilocks::add_avx(st[i], st[i], stored);
     }
 }
@@ -158,109 +201,111 @@ void Poseidon2(Goldilocks::Element *state, uint64_t* im)
     const Goldilocks::Element *D = WIDTH == 12 ? Poseidon2GoldilocksConstants::DIAG_3 : Poseidon2GoldilocksConstants::DIAG_4;
 
     uint64_t index = 0;
-// #ifdef __AVX2__
-//     __m256i st[WIDTH/4];
-//     for (int i = 0; i < WIDTH/4; i++) {
-//         Goldilocks::load_avx(st[i], &(state[4*i]));
-//     }
+#ifdef __AVX2__
+    __m256i st[WIDTH/4];
+    for (int i = 0; i < WIDTH/4; i++) {
+        Goldilocks::load_avx(st[i], &(state[4*i]));
+    }
 
-//     matmul_external_avx(st);
+    matmul_external_avx(st);
 
-//     for (int i = 0; i < WIDTH/4; i++) {
-//         Goldilocks::store_avx(&(state[4*i]), st[i]);
-//     }
+    for (int i = 0; i < WIDTH/4; i++) {
+        Goldilocks::store_avx(&(state[4*i]), st[i]);
+    }
     
-//     for (int i = 0; i < WIDTH; i++) {
-//         im[index++] = Goldilocks::toU64(state[i]);
-//     }
+    for (int i = 0; i < WIDTH; i++) {
+        im[index++] = Goldilocks::toU64(state[i]);
+    }
 
-//     for (int r = 0; r < 4; r++)
-//     {
-//         add_avx_small(st, &(RC[WIDTH * r]));
-//         pow7_avx(st);
-//         matmul_external_avx(st);
+    for (int r = 0; r < 4; r++)
+    {
+        add_avx_small(st, &(RC[WIDTH * r]));
+        pow7_avx(st);
+        matmul_external_avx(st);
 
-//         for (int i = 0; i < WIDTH/4; i++) {
-//             Goldilocks::store_avx(&(state[4*i]), st[i]);
-//         }
+        for (int i = 0; i < WIDTH/4; i++) {
+            Goldilocks::store_avx(&(state[4*i]), st[i]);
+        }
         
-//         for (int i = 0; i < WIDTH; i++) {
-//             im[index++] = Goldilocks::toU64(state[i]);
-//         }
-//     }
+        for (int i = 0; i < WIDTH; i++) {
+            im[index++] = Goldilocks::toU64(state[i]);
+        }
+    }
     
-//     Goldilocks::store_avx(&(state[0]), st0);
-//     Goldilocks::Element state0_ = state[0];
+    Goldilocks::store_avx(&(state[0]), st[0]);
+    Goldilocks::Element state0_ = state[0];
 
-//     __m256i d[WIDTH/4];
-//     for (int i = 0; i < WIDTH/4; i++) {
-//         Goldilocks::load_avx(d[i], &(D[4*i]));
-//     }
+    __m256i d[WIDTH/4];
+    for (int i = 0; i < WIDTH/4; i++) {
+        Goldilocks::load_avx(d[i], &(D[4*i]));
+    }
 
-//     __m256i part_sum;
-//     Goldilocks::Element partial_sum[4];
-//     Goldilocks::Element aux = state0_;
-//     for (int r = 0; r < 22; r++)
-//     {
-//         Goldilocks::add_avx(part_sum, st1, st2);
-//         Goldilocks::add_avx(part_sum, part_sum, st0);
-//         Goldilocks::store_avx(partial_sum, part_sum);
-//         Goldilocks::Element sum = partial_sum[0] + partial_sum[1] + partial_sum[2] + partial_sum[3];
-//         sum = sum - aux;
+    __m256i part_sum;
+    Goldilocks::Element partial_sum[4];
+    Goldilocks::Element aux = state0_;
+    for (int r = 0; r < 22; r++)
+    {
+        Goldilocks::add_avx(part_sum, st[0], st[1]);
+        Goldilocks::add_avx(part_sum, part_sum, st[2]);
+        Goldilocks::add_avx(part_sum, part_sum, st[3]);
+        Goldilocks::store_avx(partial_sum, part_sum);
+        Goldilocks::Element sum = partial_sum[0] + partial_sum[1] + partial_sum[2] + partial_sum[3];
+        sum = sum - aux;
 
-//         im[index++] = Goldilocks::toU64(state0_);
-//         state0_ = state0_ + Poseidon2GoldilocksConstants::C[4 * 12 + r];
-//         pow7(state0_);
-//         sum = sum + state0_;    
+        im[index++] = Goldilocks::toU64(state0_);
+        state0_ = state0_ + RC[4 * WIDTH + r];
+        pow7(state0_);
+        sum = sum + state0_;    
             
-//         __m256i scalar1 = _mm256_set1_epi64x(sum.fe);
-//         Goldilocks::mult_avx(st0, st0, d0);
-//         Goldilocks::mult_avx(st1, st1, d1);
-//         Goldilocks::mult_avx(st2, st2, d2);
-//         Goldilocks::add_avx(st0, st0, scalar1);
-//         Goldilocks::add_avx(st1, st1, scalar1);
-//         Goldilocks::add_avx(st2, st2, scalar1);
-//         state0_ = state0_ * Poseidon2GoldilocksConstants::D[0] + sum;
-//         aux = aux * Poseidon2GoldilocksConstants::D[0] + sum;
-//         if (r == 10 || r == 21) {
-//             im[index++] = 0;
-//             Goldilocks::store_avx(&(state[0]), st0);
-//             Goldilocks::store_avx(&(state[4]), st1);
-//             Goldilocks::store_avx(&(state[8]), st2);
+        __m256i scalar1 = _mm256_set1_epi64x(sum.fe);
+        for (int i = 0; i < WIDTH/4; i++) {
+            Goldilocks::mult_avx(st[i], st[i], d[i]);
+            Goldilocks::add_avx(st[i], st[i], scalar1);
+        }
+        state0_ = state0_ * D[0] + sum;
+        aux = aux * D[0] + sum;
+        if (r == 10 || r == 21) {
+            for (int i = 11; i < WIDTH; i++) {
+                im[index++] = 0;
+            }
             
-//             im[index++] = Goldilocks::toU64(state0_);
-//             for (int i = 1; i < 12; i++) {
-//                 im[index++] = Goldilocks::toU64(state[i]);
-//             }
-//         }
-//     }
+            for (int i = 0; i < WIDTH/4; i++) {
+                Goldilocks::store_avx(&(state[4*i]), st[i]);
+            }
+            
+            im[index++] = Goldilocks::toU64(state0_);
+            for (int i = 1; i < WIDTH; i++) {
+                im[index++] = Goldilocks::toU64(state[i]);
+            }
+        }
+    }
 
-    // Goldilocks::store_avx(&(state[0]), st0);
-    // state[0] = state0_;
-    // Goldilocks::load_avx(st0, &(state[0]));
+    Goldilocks::store_avx(&(state[0]), st[0]);
+    state[0] = state0_;
+    Goldilocks::load_avx(st[0], &(state[0]));
 
-    // for (int r = 0; r < 4; r++)
-    // {
-    //     add_avx_small(st, &(RC[4 * WIDTH + 22 + WIDTH * r]));
-    //     pow7_avx(st);
+    for (int r = 0; r < 4; r++)
+    {
+        add_avx_small(st, &(RC[4 * WIDTH + 22 + WIDTH * r]));
+        pow7_avx(st);
         
-    //     matmul_external_avx(st);
+        matmul_external_avx(st);
 
-    //     if (r < 3) {
-    //         for (int i = 0; i < WIDTH/4; i++) {
-    //             Goldilocks::store_avx(&(state[4*i]), st[i]);
-    //         }
+        if (r < 3) {
+            for (int i = 0; i < WIDTH/4; i++) {
+                Goldilocks::store_avx(&(state[4*i]), st[i]);
+            }
             
-    //         for (int i = 0; i < WIDTH; i++) {
-    //             im[index++] = Goldilocks::toU64(state[i]);
-    //         }
-    //     }
-    // }
+            for (int i = 0; i < WIDTH; i++) {
+                im[index++] = Goldilocks::toU64(state[i]);
+            }
+        }
+    }
     
-    // for (int i = 0; i < WIDTH/4; i++) {
-    //     Goldilocks::store_avx(&(state[4*i]), st[i]);
-    // }
-// #else
+    for (int i = 0; i < WIDTH/4; i++) {
+        Goldilocks::store_avx(&(state[4*i]), st[i]);
+    }
+#else
     matmul_external_(state);
     
     for(uint64_t i = 0; i < WIDTH; ++i) {
@@ -304,7 +349,7 @@ void Poseidon2(Goldilocks::Element *state, uint64_t* im)
             }
         }
     }
-// #endif
+#endif
 }
 
 
