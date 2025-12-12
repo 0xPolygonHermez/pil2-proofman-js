@@ -1,6 +1,6 @@
 {
   "name": "pil2-proofman-js",
-  "version": "0.5.0",
+  "version": "0.15.0",
   "description": "Proof Generation Manager for PIL2",
   "author": "Polygon Hermez",
   "main": "index.js",
