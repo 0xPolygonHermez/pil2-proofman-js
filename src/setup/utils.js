@@ -49,7 +49,7 @@ function generateStarkStruct(settings, nBits) {
     
     starkStruct.steps = [{nBits: starkStruct.nBitsExt}];
     let friStepBits = starkStruct.nBitsExt;
-    while (friStepBits > finalDegree) {
+    while (friStepBits > finalDegree + 1) {
         friStepBits = Math.max(friStepBits - foldingFactor, finalDegree);
         starkStruct.steps.push({
             nBits: friStepBits,
