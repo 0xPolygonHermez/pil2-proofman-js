@@ -47,16 +47,16 @@ module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot,
     
     console.log("Number of rows used", NUsed);
 
-    let nBitsC18 = log2(NUsed - 1) + 1;
+    let nBits = log2(NUsed - 1) + 1;
 
     await fs.promises.rm(tempDir, { recursive: true, force: true });
     
     let recursiveBits = 17;
 
-    if(nBitsC18 > recursiveBits) {
-        return { hasCompressor: true, nBits: nBitsC18 };
-    } else if(nBitsC18 === recursiveBits) {
-        return { hasCompressor: false, nCols: 59 };
+    if(nBits > recursiveBits) {
+        return true;
+    } else if(nBits === recursiveBits) {
+        return false;
     } else {
         const nRowsPerFri = NUsed / starkInfo.starkStruct.nQueries;
         const minimumQueriesRequired = Math.ceil((2**(recursiveBits - 1) + 2**12) / nRowsPerFri);
@@ -64,7 +64,7 @@ module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot,
         starkInfo.starkStruct.nQueries = minimumQueriesRequired;
         await fs.promises.writeFile(starkInfoFile, JSON.stringify(starkInfo, null, 1), "utf8");
 
-        return { hasCompressor: false, nCols: 59 };
+        return false;
     }
     
 }

@@ -122,6 +122,10 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
 
     await fixedCols.saveToFile(`${filesDir}/${template}.const`);
 
+    if (!starkStruct) {
+        assert(template === "compressor");
+        starkStruct = generateStarkStruct({ blowupFactor: 2 }, Math.log2(air.numRows));
+    }
     let setupAggregation;
     if (!setupAggregation_) {
         setupAggregation = await starkSetup(air, starkStruct, {...setupOptions, airgroupId, airId});        

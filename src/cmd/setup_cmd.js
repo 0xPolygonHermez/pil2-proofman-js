@@ -154,17 +154,14 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
                 let constRoot, starkInfo, verifierInfo;
                 const starkStructRecursive1 = { ...starkStructRecursive };
             
-                if (compressorNeeded.hasCompressor) {
+                if (compressorNeeded) {
                     setup[airgroup.airgroupId][air.airId].hasCompressor = true;
                     globalInfo.airs[airgroup.airgroupId][air.airId].hasCompressor = true;
-                
-                    const starkStructSettings = { blowupFactor: 2 };
-                    const starkStructCompressor = generateStarkStruct(starkStructSettings, compressorNeeded.nBits);
-                
+                                
                     const recursiveSetup = await genRecursiveSetup(
                         buildDir, setupOptions, "compressor", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
                         setup[airgroup.airgroupId][air.airId].constRoot, [], setup[airgroup.airgroupId][air.airId].starkInfo,
-                        setup[airgroup.airgroupId][air.airId].verifierInfo, starkStructCompressor
+                        setup[airgroup.airgroupId][air.airId].verifierInfo, null
                     );
                     
                     constRoot = recursiveSetup.constRoot;
