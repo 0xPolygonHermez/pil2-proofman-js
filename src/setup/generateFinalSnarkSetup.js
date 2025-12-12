@@ -4,7 +4,7 @@ const JSONbig = require('json-bigint')({ useNativeBigInt: true, alwaysParseAsBig
 const fs = require('fs');
 const ffjavascript = require("ffjavascript");
 
-const { compressorSetup } = require('stark-recurser/src/circom2pil/compressor_setup.js');
+const { plonk2pil } = require('stark-recurser/src/circom2pil/plonk2pil.js');
 const { genCircom } = require('stark-recurser/src/gencircom.js');
 const pil2circom = require('stark-recurser/src/pil2circom/pil2circom.js');
 const path = require("path");
@@ -53,7 +53,7 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     await runWitnessLibraryGeneration(buildDir, filesDir, template, template);
  
     // Generate setup
-    const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await compressorSetup(`${buildDir}/build/${template}.r1cs`, compressorCols);
+    const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await plonk2pil(`${buildDir}/build/${template}.r1cs`, "light", compressorCols);
     
     await writeFixedPolsBin(`${buildDir}/build/${template}.fixed.bin`, airgroupName, airName, 1 << nBits, fixedPols);
 

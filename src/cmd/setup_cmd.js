@@ -164,7 +164,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
                     const recursiveSetup = await genRecursiveSetup(
                         buildDir, setupOptions, "compressor", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
                         setup[airgroup.airgroupId][air.airId].constRoot, [], setup[airgroup.airgroupId][air.airId].starkInfo,
-                        setup[airgroup.airgroupId][air.airId].verifierInfo, starkStructCompressor, 59
+                        setup[airgroup.airgroupId][air.airId].verifierInfo, starkStructCompressor
                     );
                     
                     constRoot = recursiveSetup.constRoot;
@@ -179,7 +179,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             
                 const setupRecursive1 = await genRecursiveSetup(
                     buildDir, setupOptions, "recursive1", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
-                    constRoot, [], starkInfo, verifierInfo, starkStructRecursive, 59,
+                    constRoot, [], starkInfo, verifierInfo, starkStructRecursive,
                     setup[airgroup.airgroupId][air.airId].hasCompressor, setupsAggregation[airgroup.airgroupId]
                 );
 
@@ -194,7 +194,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
                 buildDir, setupOptions, "recursive2", airgroup.name, airgroup.airgroupId,
                 undefined, globalInfo, [], constRootsRecursives1[airgroup.airgroupId],
                 setupsAggregation[airgroup.airgroupId].starkInfo, setupsAggregation[airgroup.airgroupId].verifierInfo,
-                starkStructRecursive, 59, setupsAggregation[airgroup.airgroupId]
+                starkStructRecursive, false, setupsAggregation[airgroup.airgroupId]
             );
         };
   

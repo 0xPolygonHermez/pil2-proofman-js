@@ -2,7 +2,7 @@ const { readR1cs } = require("r1csfile");
 const fs = require("fs");
 const path = require('path');
 const pil2circom = require("stark-recurser/src/pil2circom/pil2circom.js");
-const { getCompressorConstraints } = require("stark-recurser/src/circom2pil/compressor_constraints.js");
+const { getCompressorConstraints } = require("stark-recurser/src/circom2pil/aggregation/aggregation_setup.js");
 
 const util = require('util');
 const { exec } = require('child_process');
