@@ -169,7 +169,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
                     
                     constRoot = recursiveSetup.constRoot;
                     starkInfo = recursiveSetup.setupAggregation.starkInfo;
-                    verifierInfo = recursiveSetup.setupAggregation.starkInfo;
+                    verifierInfo = recursiveSetup.setupAggregation.verifierInfo;
                 } else {
                     constRoot = setup[airgroup.airgroupId][air.airId].constRoot;
                     starkInfo = setup[airgroup.airgroupId][air.airId].starkInfo;
