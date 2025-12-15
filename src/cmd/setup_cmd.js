@@ -144,12 +144,18 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
                         
                 const filesDir = path.join(buildDir, "provingKey", airout.name, airgroup.name, "airs", `${air.name}`, "air");
 
-                const compressorNeeded = await isCompressorNeeded(
-                setup[airgroup.airgroupId][air.airId].constRoot,
-                setup[airgroup.airgroupId][air.airId].starkInfo,
-                setup[airgroup.airgroupId][air.airId].verifierInfo,
-                path.join(filesDir, `${air.name}.starkinfo.json`),
-                );
+                
+                let compressorNeeded = false;
+                if (proofManagerConfig.setup && proofManagerConfig.setup.settings && proofManagerConfig.setup.settings[`${air.name}`] && proofManagerConfig.setup.settings[`${air.name}`].hasCompressor) {
+                    compressorNeeded = true;
+                } else {
+                    compressorNeeded = await isCompressorNeeded(
+                        setup[airgroup.airgroupId][air.airId].constRoot,
+                        setup[airgroup.airgroupId][air.airId].starkInfo,
+                        setup[airgroup.airgroupId][air.airId].verifierInfo,
+                        path.join(filesDir, `${air.name}.starkinfo.json`),
+                    );
+                }
             
                 let constRoot, starkInfo, verifierInfo;
                 const starkStructRecursive1 = { ...starkStructRecursive };
