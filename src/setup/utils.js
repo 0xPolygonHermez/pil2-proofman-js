@@ -31,12 +31,14 @@ function generateStarkStruct(settings, nBits) {
     
     if(verificationHashType === "BN128") {
         starkStruct.merkleTreeArity = settings.merkleTreeArity || 16;
+        starkStruct.transcriptArity = starkStruct.merkleTreeArity;
         starkStruct.merkleTreeCustom = settings.merkleTreeCustom || false;
         hashCommits = false;
         starkStruct.lastLevelVerification = 0;
         starkStruct.powBits = 0;
     } else {
-        starkStruct.merkleTreeArity = MERKLE_TREE_ARITY;
+        starkStruct.merkleTreeArity = settings.merkleTreeArity || MERKLE_TREE_ARITY;
+        starkStruct.transcriptArity = MERKLE_TREE_ARITY;
         starkStruct.merkleTreeCustom = true;
         starkStruct.lastLevelVerification = settings.lastLevelVerification || 2;
         starkStruct.powBits = settings.powBits || 20;
@@ -105,7 +107,7 @@ async function setAiroutInfo(airout, curve) {
         }
     }
     
-    vadcopInfo.merkleTreeArity = MERKLE_TREE_ARITY;
+    vadcopInfo.transcriptArity = MERKLE_TREE_ARITY;
 
     vadcopInfo.nPublics = airout.numPublicValues;
     vadcopInfo.numChallenges = airout.numChallenges || [0];

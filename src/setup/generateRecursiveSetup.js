@@ -7,6 +7,7 @@ const pil2circom = require('stark-recurser/src/pil2circom/pil2circom.js');
 const { plonk2pil } = require('stark-recurser/src/circom2pil/plonk2pil.js');
 const {genCircom} = require('stark-recurser/src/gencircom.js');
 const ffjavascript = require("ffjavascript");
+const { assert } = require("chai");
 
 const path = require('path');
 const { runWitnessLibraryGeneration, witnessLibraryGenerationAwait } = require('./generateWitness');
