@@ -30,7 +30,6 @@ async function generateWitnessLibrary(buildDir,filesDir, nameFilename, template)
             'witness',
             `WITNESS_DIR=${path.resolve(filesDir)}`,
             `WITNESS_FILE=${template}.${fileExtension}`,
-            'FINAL_VADCOP=true'
         ];
         await new Promise((resolve, reject) => {
             const out = fs.openSync(path.join(filesDir, 'build.log'), 'a');
