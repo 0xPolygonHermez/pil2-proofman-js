@@ -10,10 +10,11 @@ const mkdir = util.promisify(fs.mkdir);
 const rm = util.promisify(fs.rm);
 
 const pendingTasks = [];
+const tmp = require('os').tmpdir();
 
 async function generateWitnessLibrary(buildDir,filesDir, nameFilename, template) {
     const randomString = crypto.randomBytes(16).toString('hex');
-    const tmpDir = path.join(path.join(__dirname, "../../tmp"), `circom_temp_${randomString}`);
+    const tmpDir = await fs.promises.mkdtemp(path.join(tmp, `witness-${randomString}-`));
 
     try {
         pendingTasks.push(randomString);
@@ -52,7 +53,7 @@ async function generateWitnessLibrary(buildDir,filesDir, nameFilename, template)
 async function generateWitnessFinalSnarkLibrary(buildDir, filesDir, template, nameFilename) {
     try {
         const randomString = crypto.randomBytes(16).toString('hex');
-        const tmpDir = path.join(path.join(__dirname, "../../tmp"), `circom_temp_${randomString}`);
+        const tmpDir = await fs.promises.mkdtemp(path.join(tmp, `witness-${randomString}-`));
         pendingTasks.push(randomString);
         try {
             mkdir(tmpDir, { recursive: true });
