@@ -413,20 +413,20 @@ async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
     let verifierRust = [];
     verifierRust.push(`use fields::{Goldilocks, CubicExtensionField, Field, Poseidon${starkInfo.starkStruct.merkleTreeArity * 4}};`);
     verifierRust.push("use crate::{Boundary, VerifierInfo, stark_verify};\n");
-    verifyQRust.unshift("pub fn q_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], _publics: &[Goldilocks], zi: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
+    verifyQRust.unshift("fn q_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], _publics: &[Goldilocks], zi: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
     verifyQRust.unshift("#[allow(clippy::all)]");
     verifyQRust.unshift("#[rustfmt::skip]");
     verifyQRust.push("}");
     verifierRust.push(...verifyQRust);
     verifierRust.push("\n");
-    verifyFRIRust.unshift("pub fn query_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], vals: &[Vec<Goldilocks>], xdivxsub: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
+    verifyFRIRust.unshift("fn query_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], vals: &[Vec<Goldilocks>], xdivxsub: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
     verifyFRIRust.unshift("#[allow(clippy::all)]");
     verifyFRIRust.unshift("#[rustfmt::skip]")
     verifyFRIRust.push("}\n");
     verifierRust.push(...verifyFRIRust);
     let verify = [];
     verify.push("#[rustfmt::skip]")
-    verify.push("pub fn verifier_info() -> VerifierInfo {");
+    verify.push("fn verifier_info() -> VerifierInfo {");
     verify.push("    VerifierInfo {");
     verify.push("        n_stages: " + starkInfo.nStages + ",");
     verify.push("        n_constants: " + starkInfo.nConstants + ",");
