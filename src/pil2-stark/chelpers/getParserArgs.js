@@ -1,4 +1,5 @@
 const { assert } = require("chai");
+const { FIELD_EXTENSION } = require("../../constants.js");
 
 const operationsTypeMap = {
     "add": 0,
@@ -77,20 +78,20 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[0])};`;
             } else {
                 if (r.op === "mul") {
-                    if (r.src[0].dim === 1 && r.src[1].dim === 3) {
+                    if (r.src[0].dim === 1 && r.src[1].dim === FIELD_EXTENSION) {
                         line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[1])} * ${getOperationVerify(r.src[0])};`;
                     } else {
                         line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[0])} * ${getOperationVerify(r.src[1])};`;
                     }
                 } else if (r.op === "add") {
-                    if (r.src[0].dim === 1 && r.src[1].dim === 3) {
+                    if (r.src[0].dim === 1 && r.src[1].dim === FIELD_EXTENSION) {
                         line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[1])} + ${getOperationVerify(r.src[0])};`;
                     } else {
                         line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[0])} + ${getOperationVerify(r.src[1])};`;
                     }
                 } else {
                     assert(r.op === "sub");
-                    if (r.src[0].dim === 1 && r.src[1].dim === 3) {
+                    if (r.src[0].dim === 1 && r.src[1].dim === FIELD_EXTENSION) {
                         line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[1])}.sub_from_scalar(${getOperationVerify(r.src[0])});`;
                     } else {
                         line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[0])} - ${getOperationVerify(r.src[1])};`;
@@ -102,7 +103,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
         const destTmp = code_[code_.length - 1].dest;
         if(destTmp.dim == 1) {
             verifyRust.push(`    return tmp_1[${ID1D[destTmp.id]}];`);
-        } else if(destTmp.dim == 3) {
+        } else if(destTmp.dim == FIELD_EXTENSION) {
             verifyRust.push(`    return tmp_3[${ID3D[destTmp.id]}];`);
         } else throw new Error("Unknown destination dimension");
     }
@@ -120,8 +121,8 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
     if(destTmp.dim == 1) {
         expsInfo.destDim = 1;
         expsInfo.destId = ID1D[destTmp.id];
-    } else if(destTmp.dim == 3) {
-        expsInfo.destDim = 3;
+    } else if(destTmp.dim == FIELD_EXTENSION) {
+        expsInfo.destDim = FIELD_EXTENSION;
         expsInfo.destId = ID3D[destTmp.id];
     } else throw new Error("Unknown");
     
@@ -143,7 +144,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                     }
                     args.push(ID1D[r.id]);
                 } else {
-                    assert(r.dim == 3);
+                    assert(r.dim == FIELD_EXTENSION);
                     if (!dest) {
                         if(!global) {
                             args.push(bufferSize + 1);
@@ -151,7 +152,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                             args.push(4);
                         }
                     }
-                    args.push(3*ID3D[r.id]);
+                    args.push(FIELD_EXTENSION*ID3D[r.id]);
                 }
                 if (!global && !dest) args.push(0);
                 break;
@@ -216,7 +217,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
             case "eval": {
                 if(global) throw new Error("evals and airvalues should not appear in a global constraint");
                 args.push(bufferSize + 8);
-                args.push(3*r.id);
+                args.push(FIELD_EXTENSION*r.id);
                 if (!global) args.push(0);
                 break;
             }
@@ -225,7 +226,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 args.push(bufferSize + 4);
                 let airValuePos = 0;
                 for(let i = 0; i < r.id; ++i) {
-                    airValuePos += starkInfo.airValuesMap[i].stage == 1 ? 1 : 3;
+                    airValuePos += starkInfo.airValuesMap[i].stage == 1 ? 1 : FIELD_EXTENSION;
                 }
                 args.push(airValuePos);
                 if (!global) args.push(0);
@@ -240,9 +241,9 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 let proofValuePos = 0;
                 for(let i = 0; i < r.id; ++i) {
                     if(!global) {
-                        proofValuePos += starkInfo.proofValuesMap[i].stage == 1 ? 1 : 3;
+                        proofValuePos += starkInfo.proofValuesMap[i].stage == 1 ? 1 : FIELD_EXTENSION;
                     } else {
-                        proofValuePos += globalInfo.proofValuesMap[i].stage == 1 ? 1 : 3;
+                        proofValuePos += globalInfo.proofValuesMap[i].stage == 1 ? 1 : FIELD_EXTENSION;
                     }
                 }
                 args.push(proofValuePos);
@@ -255,7 +256,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 } else {
                     args.push(6);
                 }
-                args.push(3*r.id);
+                args.push(FIELD_EXTENSION*r.id);
                 if (!global) args.push(0);
                 break;
             }
@@ -268,15 +269,15 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 if(!global) {
                     let airGroupValuePos = 0;
                     for(let i = 0; i < r.id; ++i) {
-                        airGroupValuePos += starkInfo.airgroupValuesMap[i].stage == 1 ? 1 : 3;
+                        airGroupValuePos += starkInfo.airgroupValuesMap[i].stage == 1 ? 1 : FIELD_EXTENSION;
                     }
                     args.push(airGroupValuePos);
                 } else {
                     let offset = 0;
                     for(let i = 0; i < r.airgroupId; ++i) {
-                        offset += 3 * globalInfo.aggTypes[i].length;
+                        offset += FIELD_EXTENSION * globalInfo.aggTypes[i].length;
                     }
-                    args.push(offset + 3*r.id);
+                    args.push(offset + FIELD_EXTENSION*r.id);
                 }
                 if (!global) args.push(0);
                 break;
@@ -304,7 +305,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
             return `commit${r.dim}`;
         } else if(r.type === "const" || (r.type === "custom" && r.dim === 1) || ((r.type === "Zi") && !verify)) {
             return "commit1";
-        } else if(r.type === "xDivXSubXi" || (r.type === "custom" && r.dim === 3) || ((r.type === "Zi") && verify)) {
+        } else if(r.type === "xDivXSubXi" || (r.type === "custom" && r.dim === FIELD_EXTENSION) || ((r.type === "Zi") && verify)) {
             return "commit3";
         } else if(r.type === "tmp") {
             return `tmp${r.dim}`;
@@ -323,7 +324,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 if (r.dim === 1) {
                     return `tmp_1[${ID1D[r.id]}]`;
                 } else {
-                    assert(r.dim === 3);
+                    assert(r.dim === FIELD_EXTENSION);
                     return `tmp_3[${ID3D[r.id]}]`;
                 }
             }
@@ -337,7 +338,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                 if (r.dim === 1) {
                     return `vals[${stage}][${stagePos}]`;
                 } else {
-                    assert(r.dim === 3);
+                    assert(r.dim === FIELD_EXTENSION);
                     return `CubicExtensionField { value: [vals[${stage}][${stagePos}], vals[${stage}][${stagePos + 1}], vals[${stage}][${stagePos + 2}]] }`;
                 }
             }
@@ -443,7 +444,7 @@ function getIdMaps(maxid, ID1D, ID3D, code) {
                     End1D[id_] = j;
                 }
             } else {
-                assert(dim_ == 3);
+                assert(dim_ == FIELD_EXTENSION);
                 if (Ini3D[id_] == -1) {
                     Ini3D[id_] = j;
                     End3D[id_] = j;
@@ -467,7 +468,7 @@ function getIdMaps(maxid, ID1D, ID3D, code) {
                         End1D[id_] = j;
                     }
                 } else {
-                    assert(dim_ == 3);
+                    assert(dim_ == FIELD_EXTENSION);
                     if (Ini3D[id_] == -1) {
                         Ini3D[id_] = j;
                         End3D[id_] = j;

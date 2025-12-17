@@ -3,6 +3,7 @@ const {generateFRIPolynomial} = require("./polynomials/friPolinomial");
 const { generateConstraintPolynomialVerifierCode, generateConstraintsDebugCode, generateExpressionsCode } = require("./code/generateCode");
 const { addInfoExpressions } = require("./helpers");
 const { printExpressions } = require("../utils");
+const { FIELD_EXTENSION } = require("../../../constants.js");
 
 module.exports.generatePilCode = function generatePilCode(res, symbols, constraints, expressions, hints, debug) {
     
@@ -21,7 +22,7 @@ module.exports.generatePilCode = function generatePilCode(res, symbols, constrai
     expressionsInfo.expressionsCode = generateExpressionsCode(res, symbols, expressions);
 
     verifierInfo.queryVerifier = expressionsInfo.expressionsCode.find(e => e.expId === res.friExpId);
-    verifierInfo.queryVerifier.code[verifierInfo.queryVerifier.code.length - 1].dest = { type: "tmp", id: verifierInfo.queryVerifier.tmpUsed - 1, dim: 3 };
+    verifierInfo.queryVerifier.code[verifierInfo.queryVerifier.code.length - 1].dest = { type: "tmp", id: verifierInfo.queryVerifier.tmpUsed - 1, dim: FIELD_EXTENSION };
     
     expressionsInfo.constraints = generateConstraintsDebugCode(res, symbols, constraints, expressions);
 
