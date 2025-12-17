@@ -14,7 +14,8 @@ class DecodingRegime {
         this.fieldSize = params.fieldSize;
         this.dimension = params.dimension;
         this.rate = params.rate;
-        this.codewordLength = this.dimension / this.rate;
+        this.codewordLength = this.dimension.div(this.rate);
+        this.augmentedRate = this.rate.mul((this.dimension.add(params.nOpeningPoints))).div(this.dimension);
         this.alpha = params.alpha || 0;
     }
 
@@ -116,8 +117,9 @@ class JBR extends DecodingRegime {
     }
 
     get maxListSize() {
+        let sqrtAugmentedRate = new Decimal(this.augmentedRate).sqrt();
         // RS codes are (1 - sqrt(rate) - gap, 1/(2*gap*sqrt(rate)))-list decodable
-        return new Decimal(1).div(new Decimal(2).mul(this.gap).mul(this.sqrtRate));
+        return new Decimal(1).div(new Decimal(2).mul(this.gap).mul(sqrtAugmentedRate));
     }
 
     get multiplicity() {
@@ -417,6 +419,7 @@ class SecurityCalculator {
             dimension: this.dimension,
             rate: this.rate,
             nFunctions: params.nFunctions,
+            nOpeningPoints: this.nOpeningPoints,
         };
 
         if (params.regime === "JBR") {
@@ -640,7 +643,7 @@ function getOptimalFRIQueryParams(name, params) {
     let alpha = 0;
     let nQueries, nGrindingBits, proximityParameter;
     while (!securityAchieved) {
-        const regimeParams = { fieldSize, dimension: params.dimension, rate: params.rate, alpha};
+        const regimeParams = { fieldSize, dimension: params.dimension, rate: params.rate, alpha, nOpeningPoints: params.nOpeningPoints };
         
         let regime;
         if (name === "JBR") {
