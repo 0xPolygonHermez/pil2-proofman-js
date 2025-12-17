@@ -31,10 +31,12 @@ module.exports.starkSetup = async function starkSetup(pil, starkStruct, options)
     starkInfo.starkStruct.nQueries = fri_security.nQueries;
     starkInfo.starkStruct.powBits = fri_security.nGrindingBits;
     starkInfo.security = {
-        proximityGap: fri_security.proximityGap,
+        proximityGap: fri_security.proximityGap.toNumber(),
+        proximityParameter: fri_security.proximityParameter.toNumber(),
         regime: "JBR",
     };
 
+    console.log(starkInfo.security);
     const res = {
         starkInfo,
         expressionsInfo,
