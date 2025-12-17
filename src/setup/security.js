@@ -12,8 +12,8 @@ Decimal.set({ precision: 200 });
 class DecodingRegime {
     constructor(params) {
         this.fieldSize = params.fieldSize;
-        this.dimension = params.dimension;
-        this.rate = params.rate;
+        this.dimension = new Decimal(params.dimension);
+        this.rate = new Decimal(params.rate);
         this.codewordLength = this.dimension.div(this.rate);
         this.augmentedRate = this.rate.mul((this.dimension.add(params.nOpeningPoints))).div(this.dimension);
         this.alpha = params.alpha || 0;
