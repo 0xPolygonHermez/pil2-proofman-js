@@ -14,7 +14,8 @@ class DecodingRegime {
         this.fieldSize = params.fieldSize;
         this.dimension = params.dimension;
         this.rate = params.rate;
-        this.codewordLength = this.dimension / this.rate;
+        this.codewordLength = this.dimension.div(this.rate);
+        this.augmentedRate = this.rate.mul((this.dimension.add(params.nOpeningPoints))).div(this.dimension);
         this.alpha = params.alpha || 0;
     }
 
@@ -53,7 +54,7 @@ class UDR extends DecodingRegime {
     }
 
     get maxDecodingRadius() {
-        return (1 - this.rate) / 2;
+        return new Decimal(1).minus(this.rate).div(2);
     }
 
     get proximityParameter() {
@@ -62,11 +63,11 @@ class UDR extends DecodingRegime {
         // TODO: Heuristic correction to stay within the decoding radius
         const correction =
             this.fieldSize >= 1n << 150n
-                ? 1 / this.codewordLength
-                : this.rate / 20;
+                ? new Decimal(1).div(this.codewordLength)
+                : this.rate.div(20);
 
-        const pp = this.maxDecodingRadius - correction;
-        assert(pp > 0, "Proximity parameter must be positive in UDR");
+        const pp = this.maxDecodingRadius.minus(correction);
+        assert(pp.gt(0), "Proximity parameter must be positive in UDR");
         return pp;
     }
 
@@ -91,54 +92,51 @@ class JBR extends DecodingRegime {
     }
 
     get sqrtRate() {
-        return Math.sqrt(this.rate);
+        return new Decimal(this.rate).sqrt();
     }
 
     get maxDecodingRadius() {
-        return 1 - this.sqrtRate;
+        return new Decimal(1).minus(this.sqrtRate);
     }
 
     get minDecodingRadius() {
-        return (1 - this.rate) / 2;
+        return new Decimal(1).minus(this.rate).div(2);
     }
 
     get proximityParameter() {
         // How close we are to the Johnson Bound 1-sqrt(rate)
-
-        // TODO: Let's use a heuristic to figure out the proximity parameter here.
-        const baseCorrection = 1 / 300;
-        const correction = baseCorrection * (1 + this.alpha);
-        const pp = Math.max(this.maxDecodingRadius - correction, this.minDecodingRadius);
-        return pp;
+        return this.maxDecodingRadius.minus(this.gap);
     }
 
     get gap() {
         // Distance from proximity parameter to Johnson bound
-        return this.maxDecodingRadius - this.proximityParameter;
+        const baseCorrection = new Decimal(1).div(300);
+        const gap = baseCorrection.mul(new Decimal(1).plus(this.alpha)).toDecimalPlaces(20, Decimal.ROUND_DOWN);
+        assert(this.minDecodingRadius.lt(this.maxDecodingRadius.minus(gap)), "Gap must be greater than minDecodingRadius in JBR");
+        return gap;
     }
 
     get maxListSize() {
+        let sqrtAugmentedRate = new Decimal(this.augmentedRate).sqrt();
         // RS codes are (1 - sqrt(rate) - gap, 1/(2*gap*sqrt(rate)))-list decodable
-        return 1 / (2 * this.gap * this.sqrtRate);
+        return new Decimal(1).div(new Decimal(2).mul(this.gap).mul(sqrtAugmentedRate));
     }
 
     get multiplicity() {
         // Theorem 4.2 of BCHKS25:
         //    m = max{ceil(sqrt(rate) / gap), 3}
-        const m = Math.ceil(this.sqrtRate / this.gap);
-        return Math.max(m, 3);
+        const m = this.sqrtRate.div(this.gap).ceil();
+        return Decimal.max(m, new Decimal(3));
     }
 
     calculateLinearError() {
         // Theorem 4.2 of BCHKS25, but substituting pp·n + 1 with n
-        const n = this.dimension / this.rate;
+        const n = new Decimal(this.dimension).div(this.rate);
         const m = this.multiplicity;
-        const m_shifted = m + 0.5;
 
-        const numerator = (2 * m_shifted ** 5 + 3 * m_shifted * this.rate) * n;
-        const denominator = new Decimal(3 * this.rate * this.sqrtRate).mul(
-            this.fieldSize
-        );
+        const m_shifted = new Decimal(m).plus(0.5);
+        const numerator = m_shifted.pow(5).mul(2).plus(m_shifted.mul(3).mul(this.rate)).mul(n);
+        const denominator = new Decimal(3).mul(this.rate).mul(this.sqrtRate).mul(this.fieldSize);
 
         return new Decimal(numerator).div(denominator);
     }
@@ -161,6 +159,7 @@ class FRISecurityCalculator {
             this.nQueries = params.nQueries;
             this.nGrindingBits = params.nGrindingBits ?? 0;
             this.proximityParameter = regime.proximityParameter;
+            this.proximityGap = regime.gap;
         } else if (params.maxGrindingBits !== undefined) {
             const optimal = this._calculateOptimalQueryParams(
                 this.targetSecurityBits,
@@ -170,6 +169,7 @@ class FRISecurityCalculator {
             this.nQueries = optimal.nQueries;
             this.nGrindingBits = optimal.nGrindingBits;
             this.proximityParameter = regime.proximityParameter;
+            this.proximityGap = regime.gap;
         } else {
             throw new Error("Must provide either nQueries or maxGrindingBits");
         }
@@ -268,7 +268,7 @@ class FRISecurityCalculator {
      * Probability that a single query misses an inconsistency
      */
     calculateSingleQueryError() {
-        return 1 - this.regime.proximityParameter;
+        return new Decimal(1).minus(this.regime.proximityParameter);
     }
 
     /**
@@ -409,8 +409,6 @@ class SecurityCalculator {
 
         // Augmented code parameters (for DEEP)
         this.augmentedDimension = this.dimension + this.nOpeningPoints;
-        this.augmentedRate =
-            this.rate * (this.augmentedDimension / this.dimension);
 
         // Field parameters
         this.fieldSize = new Decimal(params.fieldSize);
@@ -418,9 +416,10 @@ class SecurityCalculator {
         // Create the appropriate regime
         const regimeParams = {
             fieldSize: this.fieldSize,
-            dimension: this.augmentedDimension,
-            rate: this.augmentedRate,
+            dimension: this.dimension,
+            rate: this.rate,
             nFunctions: params.nFunctions,
+            nOpeningPoints: this.nOpeningPoints,
         };
 
         if (params.regime === "JBR") {
@@ -639,14 +638,12 @@ function getOptimalFRIQueryParams(name, params) {
     
     let securityAchieved = false;
 
-    let augmentedDimension = params.dimension + params.nOpeningPoints;
     let fieldSize = new Decimal(params.fieldSize);
-    let rate = params.rate * (augmentedDimension / params.dimension);
 
     let alpha = 0;
     let nQueries, nGrindingBits, proximityParameter;
     while (!securityAchieved) {
-        const regimeParams = { fieldSize, dimension: augmentedDimension, rate, alpha};
+        const regimeParams = { fieldSize, dimension: params.dimension, rate: params.rate, alpha, nOpeningPoints: params.nOpeningPoints };
         
         let regime;
         if (name === "JBR") {
@@ -676,9 +673,10 @@ function getOptimalFRIQueryParams(name, params) {
             nQueries = friCalculator.nQueries;
             nGrindingBits = friCalculator.nGrindingBits;
             proximityParameter = friCalculator.proximityParameter;
+            proximityGap = friCalculator.proximityGap;
         }
     }
-    return { nQueries, nGrindingBits, proximityParameter }
+    return { nQueries, nGrindingBits, proximityParameter, proximityGap }
 }
 
 module.exports = {
@@ -697,8 +695,8 @@ if (require.main === module) {
         fieldSize,
 
         // Code parameters
-        dimension: 2 ** 17,
-        rate: new Decimal(1 / 2),
+        dimension: new Decimal(2).pow(17),
+        rate: Decimal(1/2),
 
         // Constraints
         nConstraints: 2432,
@@ -724,7 +722,6 @@ if (require.main === module) {
     console.log("Optimal FRI Query Params for JBR:");
     console.log("Number of Grindings: ", jbr.friCalculator.nGrindingBits);
     console.log("Number of Queries: ", jbr.friCalculator.nQueries);
-    console.log("Proximity Parameter: ", jbr.regime.proximityParameter);
 
     // Compare with UDR
     const udr = createSecurityCalculator("UDR", params);
@@ -739,5 +736,5 @@ if (require.main === module) {
     console.log("Optimal FRI Query Params for JBR:");
     console.log("Number of Grindings: ", fri_security.nGrindingBits);
     console.log("Number of Queries: ", fri_security.nQueries);
-    console.log("Proximity Parameter: ", fri_security.proximityParameter);
+    console.log("Proximity gap: ", fri_security.proximityGap);
 }
