@@ -13,7 +13,8 @@ module.exports.starkSetup = async function starkSetup(pil, starkStruct, options)
         dimension: 1 << starkStruct.nBits,
         rate: new Decimal(1 / (1 << (starkStruct.nBitsExt - starkStruct.nBits))),
         nOpeningPoints: starkInfo.openingPoints.length,
-        nFunctions: starkInfo.nConstraints,
+        nConstraints: starkInfo.nConstraints,
+        nFunctions: starkInfo.evMap.length,
         foldingFactors: starkInfo.starkStruct.steps.map((_, i, arr) => {
             if (i === arr.length - 1) return null; 
             return arr[i].nBits - arr[i + 1].nBits;
