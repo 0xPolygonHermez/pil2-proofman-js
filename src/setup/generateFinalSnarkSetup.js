@@ -61,7 +61,7 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     await fs.promises.writeFile(pilFilename, pilStr, "utf8");
     
     let pilFile = `${buildDir}/build/${template}.pilout`;
-    let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath] };
+    let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath, path.resolve(__dirname, '../../', 'node_modules/stark-recurser/src/circom2pil/pil')] };
     const F = new ffjavascript.F1Field((1n<<64n)-(1n<<32n)+1n );
     compilePil2(F, pilFilename, null, pilConfig);
 
@@ -69,7 +69,7 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     await fd.write(execBuff);
     await fd.close();
 
-    const starkStructSettings = { blowupFactor: 3, verificationHashType: "BN128", merkleTreeArity: 4, merkleTreeCustom: false, lastLevelVerification: 0 };
+    const starkStructSettings = { blowupFactor: 5, verificationHashType: "BN128", merkleTreeArity: 4, merkleTreeCustom: false, lastLevelVerification: 0, powBits:22 };
     const starkStructRecursiveF = generateStarkStruct(starkStructSettings, nBits);
 
     const airout = new AirOut(pilFile);

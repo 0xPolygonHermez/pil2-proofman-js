@@ -201,10 +201,23 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             );
         };
   
-        let finalSettings = { blowupFactor: 5, finalDegree: 9, foldingFactor: 4, powBits: 22 };
+        let finalSettings; 
         if(!proofManagerConfig.setup.genFinalSnarkSetup) {
-            finalSettings.merkleTreeArity = 2;
-            finalSettings.lastLevelVerification = 6;
+            finalSettings = {
+                blowupFactor: 5, 
+                foldingFactor: 4, 
+                powBits: 22, 
+                merkleTreeArity: 2,
+                lastLevelVerification: 6,
+                finalDegree: 9
+            }
+        } else {
+            finalSettings = {
+                blowupFactor: 6, 
+                foldingFactor: 4, 
+                powBits: 22,
+                lastLevelVerification: 1
+            }
         }
         if(proofManagerConfig.setup && proofManagerConfig.setup.settings && proofManagerConfig.setup.settings.final) {
             finalSettings = proofManagerConfig.setup.settings.final;

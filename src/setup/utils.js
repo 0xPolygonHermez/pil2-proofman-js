@@ -35,7 +35,7 @@ function generateStarkStruct(settings, nBits) {
         starkStruct.merkleTreeCustom = settings.merkleTreeCustom || false;
         hashCommits = false;
         starkStruct.lastLevelVerification = 0;
-        starkStruct.powBits = 0;
+        starkStruct.powBits = settings.powBits || 0;
     } else {
         starkStruct.merkleTreeArity = settings.merkleTreeArity || MERKLE_TREE_ARITY;
         starkStruct.transcriptArity = MERKLE_TREE_ARITY;

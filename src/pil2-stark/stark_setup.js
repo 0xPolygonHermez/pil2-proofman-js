@@ -27,8 +27,6 @@ module.exports.starkSetup = async function starkSetup(pil, starkStruct, options)
 
     const fri_security = getOptimalFRIQueryParams("JBR", params);
 
-    console.log("FRI security parameters:", fri_security);
-
     starkInfo.starkStruct.nQueries = fri_security.nQueries;
     starkInfo.starkStruct.powBits = fri_security.nGrindingBits;
     starkInfo.security = {
@@ -37,7 +35,6 @@ module.exports.starkSetup = async function starkSetup(pil, starkStruct, options)
         regime: "JBR",
     };
 
-    console.log(starkInfo.security);
     const res = {
         starkInfo,
         expressionsInfo,
