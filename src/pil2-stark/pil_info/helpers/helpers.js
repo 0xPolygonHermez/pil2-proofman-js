@@ -1,3 +1,5 @@
+const { FIELD_EXTENSION } = require("../../../constants.js");
+
 module.exports.getExpDim = function getExpDim(expressions, expId) {
 
     return _getExpDim(expressions[expId]);
@@ -15,7 +17,7 @@ module.exports.getExpDim = function getExpDim(expressions, expId) {
         } else if (["const", "number", "public", "Zi"].includes(exp.op)) {
             return 1;
         } else if (["challenge", "eval", "xDivXSubXi"].includes(exp.op)) {
-            return 3;
+            return FIELD_EXTENSION;
         } else throw new Error("Exp op not defined: " + exp.op);
     }
 }
@@ -51,13 +53,13 @@ module.exports.addInfoExpressions = function addInfoExpressions(expressions, exp
         exp.expDeg = 1;
     } else if (["challenge", "eval"].includes(exp.op)) {
         exp.expDeg = 0;
-        exp.dim = 3;
+        exp.dim = FIELD_EXTENSION;
     } else if(exp.op === "airgroupvalue" || exp.op === "proofvalue") {
         exp.expDeg = 0;
-        if(!exp.dim) exp.dim = exp.stage != 1 ? 3 : 1; 
+        if(!exp.dim) exp.dim = exp.stage != 1 ? FIELD_EXTENSION : 1; 
     } else if (exp.op === "airvalue") {
         exp.expDeg = 0;
-        if(!exp.dim) exp.dim = exp.stage != 1 ? 3 : 1; 
+        if(!exp.dim) exp.dim = exp.stage != 1 ? FIELD_EXTENSION : 1; 
     } else if (exp.op === "public") {
         exp.expDeg = 0;
         exp.stage = 1; 

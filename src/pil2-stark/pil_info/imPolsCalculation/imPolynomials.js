@@ -1,6 +1,6 @@
 
 const ExpressionOps = require("../expressionops");
-
+const { FIELD_EXTENSION } = require("../../../constants.js");
 const { getExpDim, addInfoExpressions } = require("../helpers/helpers");
 
 module.exports.addIntermediatePolynomials = function addIntermediatePolynomials(res, expressions, constraints, symbols, imExps, qDeg) {
@@ -12,7 +12,7 @@ module.exports.addIntermediatePolynomials = function addIntermediatePolynomials(
 
     res.qDeg = qDeg;
 
-    const dim = 3;
+    const dim = FIELD_EXTENSION;
     const stage = res.nStages + 1;
 
     const vc_id = symbols.filter(s => s.type === "challenge" && s.stage < stage).length;
@@ -88,6 +88,8 @@ module.exports.addIntermediatePolynomials = function addIntermediatePolynomials(
         symbols.push({ type: "witness", name: `Q${i}`, polId: index, stage, dim: res.qDim, airId: res.airId, airgroupId: res.airgroupId });
         E.cm(index, 0, stage, res.qDim);
     }
+
+    res.nConstraints = constraints.length;
     
 }
 

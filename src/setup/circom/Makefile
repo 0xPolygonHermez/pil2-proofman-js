@@ -7,15 +7,10 @@ WITNESS_FILE ?= libwitness.dylib
 else
 WITNESS_FILE ?= libwitness.so
 endif
-FINAL_VADCOP ?= false
 
 BUILD_DIR := ./build
 
-ifeq ($(FINAL_VADCOP), true)
-    OPT_LEVEL := -O1
-else
-    OPT_LEVEL := -O3
-endif
+OPT_LEVEL := -O1
 
 INC_FLAGS := -I./src/setup/circom
 

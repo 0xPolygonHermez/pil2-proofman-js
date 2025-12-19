@@ -1,5 +1,6 @@
 const { addInfoExpressionsSymbols } = require("../helpers");
 const { pilCodeGen, buildCode } = require("./codegen");
+const { FIELD_EXTENSION } = require("../../../../constants.js");
 
 
 module.exports.generateExpressionsCode = function generateExpressionsCode(res, symbols, expressions) {
@@ -44,7 +45,7 @@ module.exports.generateExpressionsCode = function generateExpressionsCode(res, s
         }
 
         if(j == res.friExpId) {
-            expInfo.code[expInfo.code.length-1].dest = { type: "f", id: 0, dim: 3 };
+            expInfo.code[expInfo.code.length-1].dest = { type: "f", id: 0, dim: FIELD_EXTENSION };
         }
 
         expInfo.expId = j;

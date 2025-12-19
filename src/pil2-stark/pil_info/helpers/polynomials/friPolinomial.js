@@ -1,6 +1,7 @@
 
 const ExpressionOps = require("../../expressionops");
 const { getExpDim } = require("../helpers");
+const { FIELD_EXTENSION } = require("../../../../constants.js");
 
 
 module.exports.generateFRIPolynomial = function generateFRIPolynomial(res, symbols, expressions) {
@@ -11,8 +12,8 @@ module.exports.generateFRIPolynomial = function generateFRIPolynomial(res, symbo
     const vf1_id = symbols.filter(s => s.type === "challenge" && s.stage < stage).length;
     const vf2_id = vf1_id + 1;
     
-    const vf1_symbol = {type: "challenge", name: "std_vf1", stage, dim: 3, stageId: 0, id: vf1_id};
-    const vf2_symbol = {type: "challenge", name: "std_vf2", stage, dim: 3, stageId: 1, id: vf2_id};
+    const vf1_symbol = {type: "challenge", name: "std_vf1", stage, dim: FIELD_EXTENSION, stageId: 0, id: vf1_id};
+    const vf2_symbol = {type: "challenge", name: "std_vf2", stage, dim: FIELD_EXTENSION, stageId: 1, id: vf2_id};
 
     symbols.push(vf1_symbol);
     symbols.push(vf2_symbol);
@@ -20,8 +21,8 @@ module.exports.generateFRIPolynomial = function generateFRIPolynomial(res, symbo
     res.challengesMap[vf1_symbol.id] = {name: vf1_symbol.name, stage: vf1_symbol.stage, dim: vf1_symbol.dim, stageId: vf1_symbol.stageId};
     res.challengesMap[vf2_symbol.id] = {name: vf2_symbol.name, stage: vf2_symbol.stage, dim: vf2_symbol.dim, stageId: vf2_symbol.stageId};
 
-    const vf1 = E.challenge("std_vf1", stage, 3, 0, vf1_id);
-    const vf2 = E.challenge("std_vf2", stage, 3, 1, vf2_id);
+    const vf1 = E.challenge("std_vf1", stage, FIELD_EXTENSION, 0, vf1_id);
+    const vf2 = E.challenge("std_vf2", stage, FIELD_EXTENSION, 1, vf2_id);
 
     let friExp = null;
 
@@ -41,9 +42,9 @@ module.exports.generateFRIPolynomial = function generateFRIPolynomial(res, symbo
         }
         const e = E[ev.type](ev.id, 0, symbol.stage, symbol.dim, symbol.commitId);
         if (friExps[ev.prime]) {
-            friExps[ev.prime] = E.add(E.mul(friExps[ev.prime], vf2), E.sub(e,  E.eval(i, 3)));
+            friExps[ev.prime] = E.add(E.mul(friExps[ev.prime], vf2), E.sub(e,  E.eval(i, FIELD_EXTENSION)));
         } else {
-            friExps[ev.prime] = E.sub(e,  E.eval(i, 3));
+            friExps[ev.prime] = E.sub(e,  E.eval(i, FIELD_EXTENSION));
         }
     }
 
@@ -51,7 +52,7 @@ module.exports.generateFRIPolynomial = function generateFRIPolynomial(res, symbo
         const opening = res.openingPoints[i];
         friExps[opening] = E.mul(friExps[opening], E.xDivXSubXi(opening, i));
         if(friExp) {
-            friExp = E.add(E.mul(vf1, friExp), friExps[opening]);
+        friExp = E.add(E.mul(vf1, friExp), friExps[opening]);
         } else {
             friExp = friExps[opening];
         }

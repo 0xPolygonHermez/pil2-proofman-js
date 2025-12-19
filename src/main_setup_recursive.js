@@ -2,7 +2,6 @@ const fs = require("fs");
 const version = require("../package").version;
 const path = require("path");
 
-const { generateStarkStruct } = require("./setup/utils");
 const { genRecursiveSetupTest } = require("./setup/generateRecursiveSetup");
 
 const argv = require("yargs")
@@ -11,8 +10,8 @@ const argv = require("yargs")
     .alias("b", "builddir")
     .alias("c", "circomPath")
     .alias("n", "circomName")
-    .alias("t", "stdPath")
-    .alias("l", "nCols")
+    .alias("p", "stdPath")
+    .alias("t", "type")
         .argv;
 
 async function run() {
@@ -26,10 +25,10 @@ async function run() {
     const circomPath = argv.circomPath;
     const circomName = argv.circomName;
     
-    // Validate and set nCols
-    const nCols = argv.nCols || 36;
-    if (nCols !== 36 && nCols !== 42 && nCols !== 12) {
-        throw new Error("nCols must be either 36 or 42 or 12");
+    // Validate and set type
+    const type = typeof(argv.type) === "string" ? argv.type.trim() : "aggregation";
+    if (type != "compressor" && type !== "aggregation" && type !== "final_vadcop" && type !== "light") {
+        throw new Error("type must be either aggregation, final_vadcop or light");
     }
 
     await fs.promises.mkdir(buildDir, { recursive: true });
@@ -48,7 +47,7 @@ async function run() {
         stdPath: argv.stdPath,
     };
 
-    await genRecursiveSetupTest(buildDir, setupOptions, circomPath, circomName, nCols);
+    await genRecursiveSetupTest(buildDir, setupOptions, circomPath, circomName, type);
 
     console.log("files Generated Correctly");
 }

@@ -1,3 +1,5 @@
+const { FIELD_EXTENSION } = require("../../../../constants.js");
+
 function pilCodeGen(ctx, symbols, expressions, expId, prime) {
     if (ctx.calculated[expId] && ctx.calculated[expId][prime]) return;
 
@@ -82,7 +84,7 @@ function evalExp(ctx, symbols, expressions, exp, prime) {
     } else if (["airgroupvalue", "airvalue"].includes(exp.op)) {
         return { type: exp.op, id: exp.id, stage: exp.stage, dim: exp.dim, airgroupId: exp.airgroupId };
     } else if (exp.op == "xDivXSubXi") {
-        return { type: exp.op, id: exp.id, opening: exp.opening, dim: 3 }
+        return { type: exp.op, id: exp.id, opening: exp.opening, dim: FIELD_EXTENSION }
     } else if (exp.op == "Zi") {
         return { type: exp.op, boundaryId: exp.boundaryId, dim: 1 }
     } else {
@@ -123,7 +125,7 @@ function fixDimensionsVerifier(ctx) {
     }
 
     function getDim(r) {
-        let d = r.type === "tmp" ? tmpDim[r.id] : r.type === "Zi" ? 3 : r.dim;
+        let d = r.type === "tmp" ? tmpDim[r.id] : r.type === "Zi" ? FIELD_EXTENSION : r.dim;
         r.dim = d;
         return d;
     }
@@ -152,7 +154,7 @@ function fixEval(r, ctx) {
     delete r.prime;
     r.id = evalIndex;
     r.type = "eval";
-    r.dim = 3;
+    r.dim = FIELD_EXTENSION;
     return r;
 }
 

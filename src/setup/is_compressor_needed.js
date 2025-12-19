@@ -2,7 +2,7 @@ const { readR1cs } = require("r1csfile");
 const fs = require("fs");
 const path = require('path');
 const pil2circom = require("stark-recurser/src/pil2circom/pil2circom.js");
-const { getCompressorConstraints } = require("stark-recurser/src/circom2pil/compressor_constraints.js");
+const { getCompressorConstraints } = require("stark-recurser/src/circom2pil/aggregation/aggregation_setup.js");
 
 const util = require('util');
 const { exec } = require('child_process');
@@ -11,7 +11,7 @@ const execPromise = util.promisify(exec);
 const tmp = require('os').tmpdir();
 
 
-module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot, starkInfo, verifierInfo, starkInfoFile, useNoConjecture=false) {
+module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot, starkInfo, verifierInfo, starkInfoFile) {
 
     const tempDir = await fs.promises.mkdtemp(path.join(tmp, 'compressor-'));
 
@@ -43,20 +43,20 @@ module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot,
     
     const r1cs = await readR1cs(tmpR1csFilename);
 
-    const {NUsed} = getCompressorConstraints(r1cs, 36);
+    const {NUsed} = getCompressorConstraints(r1cs, 59);
     
     console.log("Number of rows used", NUsed);
 
-    let nBitsC18 = log2(NUsed - 1) + 1;
+    let nBits = log2(NUsed - 1) + 1;
 
     await fs.promises.rm(tempDir, { recursive: true, force: true });
     
-    let recursiveBits = useNoConjecture ? 18 : 17;
+    let recursiveBits = 17;
 
-    if(nBitsC18 > recursiveBits) {
-        return { hasCompressor: true, nBits: nBitsC18 };
-    } else if(nBitsC18 === recursiveBits) {
-        return { hasCompressor: false, nCols: 36 };
+    if(nBits > recursiveBits) {
+        return true;
+    } else if(nBits === recursiveBits) {
+        return false;
     } else {
         const nRowsPerFri = NUsed / starkInfo.starkStruct.nQueries;
         const minimumQueriesRequired = Math.ceil((2**(recursiveBits - 1) + 2**12) / nRowsPerFri);
@@ -64,7 +64,7 @@ module.exports.isCompressorNeeded = async function isCompressorNeeded(constRoot,
         starkInfo.starkStruct.nQueries = minimumQueriesRequired;
         await fs.promises.writeFile(starkInfoFile, JSON.stringify(starkInfo, null, 1), "utf8");
 
-        return { hasCompressor: false, nCols: 36 };
+        return false;
     }
     
 }

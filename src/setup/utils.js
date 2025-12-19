@@ -4,7 +4,8 @@ const { formatSymbols } = require("../pil2-stark/pil_info/utils");
 const { mapSymbols } = require("../pil2-stark/pil_info/map");
 const { assert } = require("console");
 
-const LATTICE_SIZE = 372;
+const MERKLE_TREE_ARITY = 4;
+const LATTICE_SIZE = MERKLE_TREE_ARITY == 4 ? 368 : 372;
 
 async function fileExists(path) {
     return fs.promises.access(path, fs.constants.F_OK)
@@ -13,7 +14,7 @@ async function fileExists(path) {
 }
 
 
-function generateStarkStruct(settings, nBits, useNoConjecture=false) {
+function generateStarkStruct(settings, nBits) {
     let starkStruct = {
         nBits,
     };
@@ -25,30 +26,32 @@ function generateStarkStruct(settings, nBits, useNoConjecture=false) {
     
     let hashCommits = settings.hashCommits || true;
     let blowupFactor = settings.blowupFactor || 1;
-    let nQueries = useNoConjecture ? Math.floor(256 / blowupFactor) : Math.ceil(128 / blowupFactor);
-    if(settings.nQueries > nQueries) nQueries = settings.nQueries;
-    let foldingFactor = settings.foldingFactor || 4;
+    let foldingFactor = settings.foldingFactor || 3;
     let finalDegree = settings.finalDegree || 5;
     
     if(verificationHashType === "BN128") {
         starkStruct.merkleTreeArity = settings.merkleTreeArity || 16;
+        starkStruct.transcriptArity = starkStruct.merkleTreeArity;
         starkStruct.merkleTreeCustom = settings.merkleTreeCustom || false;
         hashCommits = false;
+        starkStruct.lastLevelVerification = 0;
+        starkStruct.powBits = settings.powBits || 0;
     } else {
-        starkStruct.merkleTreeArity = 3;
+        starkStruct.merkleTreeArity = settings.merkleTreeArity || MERKLE_TREE_ARITY;
+        starkStruct.transcriptArity = MERKLE_TREE_ARITY;
         starkStruct.merkleTreeCustom = true;
+        starkStruct.lastLevelVerification = settings.lastLevelVerification || 2;
+        starkStruct.powBits = settings.powBits || 20;
     }
     
     starkStruct.hashCommits = hashCommits;
     starkStruct.nBitsExt = starkStruct.nBits + blowupFactor;
-    starkStruct.nQueries = nQueries;
     starkStruct.verificationHashType = verificationHashType;
+   
     
     starkStruct.steps = [{nBits: starkStruct.nBitsExt}];
     let friStepBits = starkStruct.nBitsExt;
-    while (friStepBits > finalDegree) {
-        if (!settings.foldingFactor && friStepBits - 6 == finalDegree) foldingFactor = 3;
-        if (!settings.foldingFactor && friStepBits - 9 == finalDegree) foldingFactor = 3;
+    while (friStepBits > finalDegree + 1) {
         friStepBits = Math.max(friStepBits - foldingFactor, finalDegree);
         starkStruct.steps.push({
             nBits: friStepBits,
@@ -82,7 +85,7 @@ async function setAiroutInfo(airout, curve) {
     if (!curve) {
         vadcopInfo.curve = "None";
         vadcopInfo.latticeSize = LATTICE_SIZE;
-        assert(vadcopInfo.latticeSize %12 == 0, "Lattice size must be multiple of 12");
+        assert(vadcopInfo.latticeSize % (MERKLE_TREE_ARITY * 4) == 0, "Lattice size must be multiple of ", MERKLE_TREE_ARITY * 4);
     } else {
         vadcopInfo.curve = curve;
         if (curve === "EcGFp5") {
@@ -104,6 +107,7 @@ async function setAiroutInfo(airout, curve) {
         }
     }
     
+    vadcopInfo.transcriptArity = MERKLE_TREE_ARITY;
 
     vadcopInfo.nPublics = airout.numPublicValues;
     vadcopInfo.numChallenges = airout.numChallenges || [0];

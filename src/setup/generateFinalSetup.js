@@ -4,7 +4,7 @@ const JSONbig = require('json-bigint')({ useNativeBigInt: true, alwaysParseAsBig
 const fs = require('fs');
 const ffjavascript = require("ffjavascript");
 
-const { compressorSetup } = require('stark-recurser/src/circom2pil/compressor_setup.js');
+const { plonk2pil } = require('stark-recurser/src/circom2pil/plonk2pil.js');
 const { genCircom } = require('stark-recurser/src/gencircom.js');
 const { generateStarkStruct } = require("./utils");
 const path = require("path");
@@ -68,7 +68,7 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
 
     // Generate setup
     const finalR1csFile = `${buildDir}/build/${nameFilename}.r1cs`;
-    const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await compressorSetup(finalR1csFile, compressorCols);
+    const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await plonk2pil(finalR1csFile, "final_vadcop", compressorCols);
 
     await writeFixedPolsBin(`${buildDir}/build/${nameFilename}.fixed.bin`, airgroupName, airName, 1 << nBits, fixedPols);
 
@@ -76,7 +76,7 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
     await fs.promises.writeFile(pilFilename, pilStr, "utf8");
 
     let pilFile = `${buildDir}/build/${nameFilename}.pilout`;
-    let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath] };
+    let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath, path.resolve(__dirname, '../../', 'node_modules/stark-recurser/src/circom2pil/pil')] };
     const F = new ffjavascript.F1Field((1n<<64n)-(1n<<32n)+1n );
     compilePil2(F, pilFilename, null, pilConfig);
 
@@ -89,7 +89,7 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
         throw new Error("Final starkStruct nBits does not match with vadcop final circuit size");
     };
 
-    let starkStructFinal = finalSettings.starkStruct || generateStarkStruct(finalSettings, nBits, setupOptions.useNoConjecture);
+    let starkStructFinal = finalSettings.starkStruct || generateStarkStruct(finalSettings, nBits);
     
     // Build stark info
     const airout = new AirOut(pilFile);
