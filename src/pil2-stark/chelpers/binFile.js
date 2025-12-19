@@ -411,22 +411,22 @@ async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
     let {verifyRust: verifyFRIRust} = getParserArgs(starkInfo, operations, verifierInfo.queryVerifier, [], false, true);
  
     let verifierRust = [];
-    verifierRust.push("use fields::{Goldilocks, CubicExtensionField, Field};");
+    verifierRust.push(`use fields::{Goldilocks, CubicExtensionField, Field, Poseidon${starkInfo.starkStruct.merkleTreeArity * 4}};`);
     verifierRust.push("use crate::{Boundary, VerifierInfo, stark_verify};\n");
-    verifyQRust.unshift("pub fn q_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], _publics: &[Goldilocks], zi: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
+    verifyQRust.unshift("fn q_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], _publics: &[Goldilocks], zi: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
     verifyQRust.unshift("#[allow(clippy::all)]");
     verifyQRust.unshift("#[rustfmt::skip]");
     verifyQRust.push("}");
     verifierRust.push(...verifyQRust);
     verifierRust.push("\n");
-    verifyFRIRust.unshift("pub fn query_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], vals: &[Vec<Goldilocks>], xdivxsub: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
+    verifyFRIRust.unshift("fn query_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], vals: &[Vec<Goldilocks>], xdivxsub: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
     verifyFRIRust.unshift("#[allow(clippy::all)]");
     verifyFRIRust.unshift("#[rustfmt::skip]")
     verifyFRIRust.push("}\n");
     verifierRust.push(...verifyFRIRust);
     let verify = [];
     verify.push("#[rustfmt::skip]")
-    verify.push("pub fn verifier_info() -> VerifierInfo {");
+    verify.push("fn verifier_info() -> VerifierInfo {");
     verify.push("    VerifierInfo {");
     verify.push("        n_stages: " + starkInfo.nStages + ",");
     verify.push("        n_constants: " + starkInfo.nConstants + ",");
@@ -440,6 +440,8 @@ async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
     verify.push("        n_challenges_total: " + (starkInfo.challengesMap.length + starkInfo.starkStruct.steps.length + 1) + ",");
     verify.push("        fri_steps: vec![" + starkInfo.starkStruct.steps.map(s => s.nBits).join(", ") + "],");
     verify.push("        hash_commits: " + starkInfo.starkStruct.hashCommits + ",");
+    verify.push("        last_level_verification: " + starkInfo.starkStruct.lastLevelVerification + ",");
+    verify.push("        pow_bits: " + starkInfo.starkStruct.powBits + ",");
     let num_vals = [];
     for(let i = 0; i < starkInfo.nStages + 1; ++i) {
         num_vals.push(starkInfo.mapSectionsN[`cm${i + 1}`]);
@@ -464,16 +466,7 @@ async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
     verify.push("    }");
     verify.push("}\n");
     verify.push("pub fn verify(proof: &[u8], vk: &[u8]) -> bool {");
-    verify.push("let mut buf = Vec::new();");
-    verify.push("let proof_data: &[u8] = if proof.len() >= 4 && proof[0..4] == [0x28, 0xB5, 0x2F, 0xFD] {");
-    verify.push("    let cursor = std::io::Cursor::new(proof);");
-    verify.push(`    let mut decoder = zstd::stream::read::Decoder::new(cursor).expect("Invalid zstd stream");`);
-    verify.push(`    std::io::Read::read_to_end(&mut decoder, &mut buf).expect("Failed to decompress zstd file");`);
-    verify.push("    &buf");
-    verify.push("} else {");
-    verify.push("    proof");
-    verify.push("};");
-    verify.push("    stark_verify(proof_data, vk, &verifier_info(), q_verify, query_verify)");
+    verify.push(`    stark_verify::<Poseidon${starkInfo.starkStruct.merkleTreeArity * 4}, ${starkInfo.starkStruct.merkleTreeArity * 4}>(proof, vk, &verifier_info(), q_verify, query_verify)`);
     verify.push("}\n");
 
     verifierRust.push(...verify);
