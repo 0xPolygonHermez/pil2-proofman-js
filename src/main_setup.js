@@ -17,6 +17,7 @@ const argv = require("yargs")
     .alias("w", "ptau")
     .alias("f", "final")
     .alias("u", "fixed")
+    .alias("n", "snark")
         .argv;
 
 async function run() {
@@ -38,11 +39,11 @@ async function run() {
             if(!argv.ptau) {
                 throw new Error("PowersOfTau file must be provided in order to generate final snark");
             }
-            if(!argv.publicsinfo) {
-                throw new Error("Publics info must be provided in order to generate final snark");
+            if(argv.snark && ["fflonk", "plonk"].indexOf(argv.snark) < 0) {
+                throw new Error("Final snark must be 'fflonk' or 'plonk'");
             }
             powersOfTauFile = argv.ptau;
-            publicsInfo = JSON.parse(await fs.promises.readFile(argv.publicsinfo, "utf8"))
+            publicsInfo = argv.publicsinfo ? JSON.parse(await fs.promises.readFile(argv.publicsinfo, "utf8")) : undefined;
         }
     }
 
@@ -66,6 +67,7 @@ async function run() {
             powersOfTauFile,
             stdPath: argv.stdPath,
             fixedPath: argv.fixed,
+            finalSnark: argv.snark || "fflonk",
         }
     }
 

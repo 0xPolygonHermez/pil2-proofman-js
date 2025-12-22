@@ -19,11 +19,11 @@ const { generateFixedCols } = require('../pil2-stark/witness_computation/witness
 const { writeFixedPolsBin, readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
 
 
-module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, setupOptions, globalInfo, constRoot, verificationKeys = [], starkInfo, verifierInfo, compressorCols) {
+module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, setupOptions, constRoot, verificationKeys = [], starkInfo, verifierInfo) {
     let template = "recursivef";
     let verifierName = "vadcop_final.verifier.circom";
     let templateFilename = path.resolve(__dirname,"../../", `node_modules/stark-recurser/src/recursion/templates/recursivef.circom.ejs`);
-    let filesDir = `${buildDir}/provingKey/${globalInfo.name}/${template}`;
+    let filesDir = `${buildDir}/provingKeySnark/${template}`;
     
     await fs.promises.mkdir(filesDir, { recursive: true });
 
@@ -33,7 +33,7 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     const verifierCircomTemplate = await pil2circom(constRoot, starkInfo, verifierInfo, options);
     await fs.promises.writeFile(`${buildDir}/circom/${verifierName}`, verifierCircomTemplate, "utf8");
 
-    const recursiveVerifier = await genCircom(templateFilename, [starkInfo], globalInfo, [verifierName], verificationKeys, [], [], options);
+    const recursiveVerifier = await genCircom(templateFilename, [starkInfo], undefined, [verifierName], verificationKeys, [], [], options);
     await fs.promises.writeFile(`${buildDir}/circom/${template}.circom`, recursiveVerifier, "utf8");
  
     const circuitsGLPath = path.resolve(__dirname, '../../', 'node_modules/stark-recurser/src/pil2circom/circuits.gl');
@@ -50,10 +50,10 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     fs.copyFile(`${buildDir}/build/${template}_cpp/${template}.dat`, `${filesDir}/${template}.dat`, (err) => { if(err) throw err; });
      
     // Generate witness library
-    await runWitnessLibraryGeneration(buildDir, filesDir, template, template);
+    runWitnessLibraryGeneration(buildDir, filesDir, template, template);
  
     // Generate setup
-    const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await plonk2pil(`${buildDir}/build/${template}.r1cs`, "light", compressorCols);
+    const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await plonk2pil(`${buildDir}/build/${template}.r1cs`, "light");
     
     await writeFixedPolsBin(`${buildDir}/build/${template}.fixed.bin`, airgroupName, airName, 1 << nBits, fixedPols);
 
@@ -102,7 +102,7 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     template = "final";
     verifierName = "recursivef.verifier.circom";
     templateFilename = path.resolve(__dirname,"../../", `node_modules/stark-recurser/src/recursion/templates/final.circom.ejs`);
-    filesDir = `${buildDir}/provingKey/${globalInfo.name}/${template}`;
+    filesDir = `${buildDir}/provingKeySnark/${template}`;
     
     await fs.promises.mkdir(filesDir, { recursive: true });
 
@@ -112,7 +112,8 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     const verifierFinalCircomTemplate = await pil2circom(setupRecursiveF.constRoot, setupRecursiveF.starkInfo, setupRecursiveF.verifierInfo, options);
     await fs.promises.writeFile(`${buildDir}/circom/${verifierName}`, verifierFinalCircomTemplate, "utf8");
 
-    const recursiveFinalVerifier = await genCircom(templateFilename, [setupRecursiveF.starkInfo], globalInfo, [verifierName], [], [], [setupOptions.publicsInfo], optionsFinal);
+    const publicsHashFinal = setupOptions.publicsInfo ? [setupOptions.publicsInfo] : undefined;
+    const recursiveFinalVerifier = await genCircom(templateFilename, [setupRecursiveF.starkInfo], undefined, [verifierName], [], [], publicsHashFinal, optionsFinal);
     await fs.promises.writeFile(`${buildDir}/circom/${template}.circom`, recursiveFinalVerifier, "utf8");
   
     const circuitsBN128Path = path.resolve(__dirname, '../../', 'node_modules/stark-recurser/src/pil2circom/circuits.bn128');
@@ -132,17 +133,20 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     fs.copyFile(`${buildDir}/build/${template}_cpp/${template}.dat`, `${filesDir}/${template}.dat`, (err) => { if(err) throw err; });
 
     await runFinalSnarkWitnessLibraryGenerationAwait(buildDir, filesDir, template, template);
+    console.log(`Computing ${setupOptions.finalSnark} setup...`);
+    const snarkExec = setupOptions.finalSnark == "fflonk" ? setupOptions.fflonkSetup : setupOptions.plonkSetup;
+    const {stdout} = await exec(`${snarkExec} ${buildDir}/build/${template}.r1cs ${setupOptions.powersOfTauFile} ${filesDir}/${template}.zkey`);
+    console.log(stdout);
 
-    console.log("Computing Fflonk setup...");
-    const stdoutFflonkSetup = await exec(`${setupOptions.fflonkSetup} ${buildDir}/build/${template}.r1cs ${setupOptions.powersOfTauFile} ${filesDir}/${template}.zkey`);
-    console.log(stdoutFflonkSetup.stdout);
-
-    console.log("Writing fflonk verification key...");
+    console.log(`Writing ${setupOptions.finalSnark} verification key...`);
     const verkey = await snarkjs.zKey.exportVerificationKey(`${filesDir}/${template}.zkey`);
     await fs.promises.writeFile(`${filesDir}/${template}.verkey.json`, JSON.stringify(verkey), "utf8");
 
-    console.log("Writing solidity fflonk verifier...");
-    const solidityVerifier = await snarkjs.zKey.exportSolidityVerifier(`${filesDir}/${template}.zkey`, {fflonk: fs.readFileSync(path.join(__dirname, "../../node_modules/snarkjs/templates/verifier_fflonk.sol.ejs"), "utf8") });
+    console.log(`Writing solidity ${setupOptions.finalSnark} verifier...`);
+    const templateSolidity = setupOptions.finalSnark == "fflonk" 
+        ? {fflonk: fs.readFileSync(path.join(__dirname, `../../node_modules/snarkjs/templates/verifier_${setupOptions.finalSnark}.sol.ejs`), "utf8") }
+        : {plonk: fs.readFileSync(path.join(__dirname, `../../node_modules/snarkjs/templates/verifier_${setupOptions.finalSnark}.sol.ejs`), "utf8") };
+    const solidityVerifier = await snarkjs.zKey.exportSolidityVerifier(`${filesDir}/${template}.zkey`, templateSolidity);
     await fs.promises.writeFile(`${filesDir}/${template}.sol`, solidityVerifier, "utf8");
     
     await witnessLibraryGenerationAwait();

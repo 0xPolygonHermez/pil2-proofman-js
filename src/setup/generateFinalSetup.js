@@ -18,15 +18,14 @@ const { generateFixedCols } = require('../pil2-stark/witness_computation/witness
 const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
 const { writeFixedPolsBin, readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
 
-module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, compressorCols) {
+module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptions,globalInfo, globalConstraints) {
     const starkInfos = [];
     const verifierInfos = [];
     const aggregatedKeysRecursive2 = [];
     const basicKeysRecursive1 = [];
     const verifierNames = [];
 
-    const nameFilename = "vadcop_final";
-    const finalFilename = `${buildDir}/circom/${nameFilename}.circom`;
+    const finalFilename = `${buildDir}/circom/vadcop_final.circom`;
 
     for(let i = 0; i < globalInfo.aggTypes.length; i++) {
         const starkInfo = JSON.parse(await fs.promises.readFile(`${buildDir}/provingKey/${globalInfo.name}/${globalInfo.air_groups[i]}/recursive2/recursive2.starkinfo.json`, "utf8"));
@@ -40,7 +39,7 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
         verifierNames.push( `${globalInfo.air_groups[i]}_recursive2.verifier.circom`);
     }
         
-    const filesDir = `${buildDir}/provingKey/${globalInfo.name}/${nameFilename}`;
+    const filesDir = `${buildDir}/provingKey/${globalInfo.name}/vadcop_final`;
     await fs.promises.mkdir(filesDir, { recursive: true });
 
     let templateFilename = path.resolve(__dirname, "../..", `node_modules/stark-recurser/src/vadcop/templates/final.circom.ejs`);
@@ -62,75 +61,99 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
     console.log(execCompile.stdout);
     
     console.log("Copying circom files...");
-    fs.copyFile(`${buildDir}/build/${nameFilename}_cpp/${nameFilename}.dat`, `${buildDir}/provingKey/${globalInfo.name}/${nameFilename}/${nameFilename}.dat`, (err) => { if(err) throw err; });
+    fs.copyFile(`${buildDir}/build/vadcop_final_cpp/vadcop_final.dat`, `${buildDir}/provingKey/${globalInfo.name}/vadcop_final/vadcop_final.dat`, (err) => { if(err) throw err; });
     
-    runWitnessLibraryGeneration(buildDir, filesDir, nameFilename, nameFilename);
+    runWitnessLibraryGeneration(buildDir, filesDir, "vadcop_final", "vadcop_final");
 
     // Generate setup
-    const finalR1csFile = `${buildDir}/build/${nameFilename}.r1cs`;
-    const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await plonk2pil(finalR1csFile, "final_vadcop", compressorCols);
+    const finalR1csFile = `${buildDir}/build/vadcop_final.r1cs`;
+    const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await plonk2pil(finalR1csFile, "final_vadcop");
 
-    await writeFixedPolsBin(`${buildDir}/build/${nameFilename}.fixed.bin`, airgroupName, airName, 1 << nBits, fixedPols);
+    await writeFixedPolsBin(`${buildDir}/build/vadcop_final.fixed.bin`, airgroupName, airName, 1 << nBits, fixedPols);
 
-    const pilFilename = `${buildDir}/pil/${nameFilename}.pil`;
+    const pilFilename = `${buildDir}/pil/vadcop_final.pil`;
     await fs.promises.writeFile(pilFilename, pilStr, "utf8");
 
-    let pilFile = `${buildDir}/build/${nameFilename}.pilout`;
+    let pilFile = `${buildDir}/build/vadcop_final.pilout`;
     let pilConfig = { outputFile: pilFile, includePaths: [setupOptions.stdPath, path.resolve(__dirname, '../../', 'node_modules/stark-recurser/src/circom2pil/pil')] };
     const F = new ffjavascript.F1Field((1n<<64n)-(1n<<32n)+1n );
     compilePil2(F, pilFilename, null, pilConfig);
 
-    const fd =await fs.promises.open(`${filesDir}/${nameFilename}.exec`, "w+");
+    const fd =await fs.promises.open(`${filesDir}/vadcop_final.exec`, "w+");
     await fd.write(execBuff);
     await fd.close();
 
 
-    if(finalSettings.starkStruct && finalSettings.starkStruct.nBits !== nBits) {
-        throw new Error("Final starkStruct nBits does not match with vadcop final circuit size");
-    };
-
-    let starkStructFinal = finalSettings.starkStruct || generateStarkStruct(finalSettings, nBits);
-    
-    // Build stark info
     const airout = new AirOut(pilFile);
     let air = airout.airGroups[0].airs[0];
 
     let fixedInfo = {};
-    await readFixedPolsBin(fixedInfo, `${buildDir}/build/${nameFilename}.fixed.bin`);
+    await readFixedPolsBin(fixedInfo, `${buildDir}/build/vadcop_final.fixed.bin`);
     const fixedCols = generateFixedCols(air.symbols.filter(s => s.airGroupId == 0), air.numRows);
     await getFixedPolsPil2(airout.airGroups[0].name, air, fixedCols, fixedInfo);
 
-    await fixedCols.saveToFile(`${filesDir}/${nameFilename}.const`);
+    await fixedCols.saveToFile(`${filesDir}/vadcop_final.const`);
+    
+    let finalSettings = { name: "vadcop_final", blowupFactor: 5, foldingFactor: 4, powBits: 22, merkleTreeArity: 2, lastLevelVerification: 6, finalDegree: 9};
+    let finalSettingsSnark = { name: "vadcop_final_snark", blowupFactor: 6, foldingFactor: 4, powBits: 22, lastLevelVerification: 1 };
+    
+    if(finalSettings.starkStruct && finalSettings.starkStruct.nBits !== nBits) {
+        throw new Error("Final starkStruct nBits does not match with vadcop final circuit size");
+    };
 
+    let starkStructFinal = generateStarkStruct(finalSettings, nBits);
     const setup = await starkSetup(air, starkStructFinal, {...setupOptions, airgroupId: 0, airId: 0});
 
-    await fs.promises.writeFile(`${filesDir}/${nameFilename}.starkinfo.json`, JSON.stringify(setup.starkInfo, null, 1), "utf8");
+    await fs.promises.writeFile(`${filesDir}/vadcop_final.starkinfo.json`, JSON.stringify(setup.starkInfo, null, 1), "utf8");
+    await fs.promises.writeFile(`${filesDir}/vadcop_final.expressionsinfo.json`, JSON.stringify(setup.expressionsInfo, null, 1), "utf8");
+    await fs.promises.writeFile(`${filesDir}/vadcop_final.verifierinfo.json`, JSON.stringify(setup.verifierInfo, null, 1), "utf8");
 
-    await fs.promises.writeFile(`${filesDir}/${nameFilename}.expressionsinfo.json`, JSON.stringify(setup.expressionsInfo, null, 1), "utf8");
-
-    await fs.promises.writeFile(`${filesDir}/${nameFilename}.verifierinfo.json`, JSON.stringify(setup.verifierInfo, null, 1), "utf8");
-    
-    console.log("Computing Constant Tree...");
-    const {stdout} = await exec(`${setupOptions.constTree} -c ${filesDir}/${nameFilename}.const -s ${filesDir}/${nameFilename}.starkinfo.json -v ${filesDir}/${nameFilename}.verkey.json`);
-    setup.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/${nameFilename}.verkey.json`, "utf8"));
+    await exec(`${setupOptions.constTree} -c ${filesDir}/vadcop_final.const -s ${filesDir}/vadcop_final.starkinfo.json -v ${filesDir}/vadcop_final.verkey.json`);
+    setup.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/vadcop_final.verkey.json`, "utf8"));
 
     const constRootBuffer = Buffer.alloc(32);
     for (let i = 0; i < 4; i++) {
         constRootBuffer.writeBigUInt64LE(setup.constRoot[i], i * 8);
     }
-    await fs.promises.writeFile(`${filesDir}/${nameFilename}.verkey.bin`, constRootBuffer);
+    await fs.promises.writeFile(`${filesDir}/vadcop_final.verkey.bin`, constRootBuffer);
 
-    const { stdout: stdout2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${nameFilename}.starkinfo.json -e ${filesDir}/${nameFilename}.expressionsinfo.json -b ${filesDir}/${nameFilename}.bin`);
+    const { stdout: stdout2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/vadcop_final.starkinfo.json -e ${filesDir}/vadcop_final.expressionsinfo.json -b ${filesDir}/vadcop_final.bin`);
     console.log(stdout2);
 
-    const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${nameFilename}.starkinfo.json -e ${filesDir}/${nameFilename}.verifierinfo.json -b ${filesDir}/${nameFilename}.verifier.bin --verifier`);
+    const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${filesDir}/vadcop_final.starkinfo.json -e ${filesDir}/vadcop_final.verifierinfo.json -b ${filesDir}/vadcop_final.verifier.bin --verifier`);
     console.log(stdout3);
 
-    writeVerifierRustFile(`${filesDir}/${nameFilename}.verifier.rs`, setup.starkInfo, setup.verifierInfo, setup.constRoot);
+    writeVerifierRustFile(`${filesDir}/vadcop_final.verifier.rs`, setup.starkInfo, setup.verifierInfo, setup.constRoot);
+
+
+    let starkStructFinalForSnark = generateStarkStruct(finalSettingsSnark, nBits);
+    const setupForSnark = await starkSetup(air, starkStructFinalForSnark, {...setupOptions, airgroupId: 0, airId: 0});
+
+    await fs.promises.writeFile(`${filesDir}/vadcop_final_snark.starkinfo.json`, JSON.stringify(setupForSnark.starkInfo, null, 1), "utf8");
+    await fs.promises.writeFile(`${filesDir}/vadcop_final_snark.expressionsinfo.json`, JSON.stringify(setupForSnark.expressionsInfo, null, 1), "utf8");
+    await fs.promises.writeFile(`${filesDir}/vadcop_final_snark.verifierinfo.json`, JSON.stringify(setupForSnark.verifierInfo, null, 1), "utf8");
+   
+    await exec(`${setupOptions.constTree} -c ${filesDir}/vadcop_final.const -s ${filesDir}/vadcop_final_snark.starkinfo.json -v ${filesDir}/vadcop_final_snark.verkey.json`);
+    setupForSnark.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/vadcop_final_snark.verkey.json`, "utf8"));
+
+    const constRootBufferSnark = Buffer.alloc(32);
+    for (let i = 0; i < 4; i++) {
+        constRootBufferSnark.writeBigUInt64LE(setupForSnark.constRoot[i], i * 8);
+    }
+    await fs.promises.writeFile(`${filesDir}/vadcop_final_snark.verkey.bin`, constRootBufferSnark);
+
+    const { stdout: stdout2_2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/vadcop_final_snark.starkinfo.json -e ${filesDir}/vadcop_final_snark.expressionsinfo.json -b ${filesDir}/vadcop_final_snark.bin`);
+    console.log(stdout2_2);
+
+    const { stdout: stdout3_2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/vadcop_final_snark.starkinfo.json -e ${filesDir}/vadcop_final_snark.verifierinfo.json -b ${filesDir}/vadcop_final_snark.verifier.bin --verifier`);
+    console.log(stdout3_2);
+
+    writeVerifierRustFile(`${filesDir}/vadcop_final_snark.verifier.rs`, setupForSnark.starkInfo, setupForSnark.verifierInfo, setupForSnark.constRoot);
 
     if(!setupOptions.powersOfTauFile) {
         await witnessLibraryGenerationAwait();
     }
 
-    return {starkInfoFinal: setup.starkInfo, verifierInfoFinal: setup.verifierInfo, constRootFinal: setup.constRoot, nBitsFinal: nBits};
+    return {starkInfoFinal: setupForSnark.starkInfo, verifierInfoFinal: setupForSnark.verifierInfo, constRootFinal: setupForSnark.constRoot};
+
 }

@@ -37,9 +37,11 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         publicsInfo: proofManagerConfig.setup && proofManagerConfig.setup.publicsInfo,
         powersOfTauFile: proofManagerConfig.setup && proofManagerConfig.setup.powersOfTauFile,
         fflonkSetup: path.resolve(__dirname, '../setup/build/fflonkSetup'),
+        plonkSetup: path.resolve(__dirname, '../setup/build/plonkSetup'),
         binFiles: proofManagerConfig.setup && proofManagerConfig.setup.binFiles,
         stdPath: proofManagerConfig.setup && proofManagerConfig.setup.stdPath,
         fixedPath: proofManagerConfig.setup && proofManagerConfig.setup.fixedPath,
+        finalSnark: proofManagerConfig.setup && proofManagerConfig.setup.finalSnark,
     };
     
     let setup = [];
@@ -118,7 +120,8 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     
     let globalInfo;
     let globalConstraints;
-    
+    let finalVadcopFinalSnark;
+
     if(proofManagerConfig.setup && proofManagerConfig.setup.genAggregationSetup) {
         const airoutInfo = await setAiroutInfo(airout);
         globalConstraints = airoutInfo.globalConstraints;
@@ -201,41 +204,8 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             );
         };
   
-        let finalSettings; 
-        if(!proofManagerConfig.setup.genFinalSnarkSetup) {
-            finalSettings = {
-                blowupFactor: 5, 
-                foldingFactor: 4, 
-                powBits: 22, 
-                merkleTreeArity: 2,
-                lastLevelVerification: 6,
-                finalDegree: 9
-            }
-        } else {
-            finalSettings = {
-                blowupFactor: 6, 
-                foldingFactor: 4, 
-                powBits: 22,
-                lastLevelVerification: 1
-            }
-        }
-        if(proofManagerConfig.setup && proofManagerConfig.setup.settings && proofManagerConfig.setup.settings.final) {
-            finalSettings = proofManagerConfig.setup.settings.final;
-        }
+        finalVadcopFinalSnark = await genFinalSetup(buildDir, setupOptions, globalInfo, globalConstraints);
 
-        const {starkInfoFinal,
-            constRootFinal,
-            verifierInfoFinal,
-        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 62);
-        
-        if(proofManagerConfig.setup.genFinalSnarkSetup) {
-            await genFinalSnarkSetup(
-                buildDir, setupOptions, globalInfo, constRootFinal, [],
-                starkInfoFinal, verifierInfoFinal,
-                12,
-            );
-        }
-        
     } else {
         const airoutInfo = await setAiroutInfo(airout);
         globalInfo = airoutInfo.vadcopInfo;
@@ -245,6 +215,17 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     await fs.promises.writeFile(`${buildDir}/provingKey/pilout.globalInfo.json`, JSON.stringify(globalInfo, null, 1), "utf8");
     await fs.promises.writeFile(`${buildDir}/provingKey/pilout.globalConstraints.json`, JSON.stringify(globalConstraints, null, 1), "utf8");
     await writeGlobalConstraintsBinFile(globalInfo, globalConstraints, `${buildDir}/provingKey/pilout.globalConstraints.bin`);
+
+    if(proofManagerConfig.setup && proofManagerConfig.setup.genAggregationSetup && proofManagerConfig.setup.genFinalSnarkSetup) {
+        let constRootFinalSnark = finalVadcopFinalSnark.constRootFinal;
+        let starkInfoFinalSnark = finalVadcopFinalSnark.starkInfoFinal;
+        let verifierInfoFinalSnark = finalVadcopFinalSnark.verifierInfoFinal;
+
+        await genFinalSnarkSetup(
+            buildDir, setupOptions, constRootFinalSnark, [],
+            starkInfoFinalSnark, verifierInfoFinalSnark
+        );
+    }
 
     return { setup, airoutInfo: {...globalInfo, globalConstraints}, config: proofManagerConfig };
 }
