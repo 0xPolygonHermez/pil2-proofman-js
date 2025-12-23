@@ -222,9 +222,11 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         let verifierInfoFinalSnark = finalVadcopFinalSnark.verifierInfoFinal;
 
         await genFinalSnarkSetup(
-            buildDir, setupOptions, constRootFinalSnark, [],
+            buildDir, globalInfo.name, setupOptions, constRootFinalSnark, [],
             starkInfoFinalSnark, verifierInfoFinalSnark
         );
+
+        await fs.promises.writeFile(`${buildDir}/provingKeySnark/publics_info.json`, JSON.stringify(setupOptions.publicsInfo, null, 1), "utf8");
     }
 
     return { setup, airoutInfo: {...globalInfo, globalConstraints}, config: proofManagerConfig };

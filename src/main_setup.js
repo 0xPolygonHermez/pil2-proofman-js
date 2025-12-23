@@ -36,6 +36,9 @@ async function run() {
             throw new Error("Std path and name must be provided");
         }
         if(argv.final) {
+            if(!argv.publicsinfo) {
+                throw new Error("Publics info file must be provided in order to generate final snark");
+            }
             if(!argv.ptau) {
                 throw new Error("PowersOfTau file must be provided in order to generate final snark");
             }
@@ -43,7 +46,7 @@ async function run() {
                 throw new Error("Final snark must be 'fflonk' or 'plonk'");
             }
             powersOfTauFile = argv.ptau;
-            publicsInfo = argv.publicsinfo ? JSON.parse(await fs.promises.readFile(argv.publicsinfo, "utf8")) : undefined;
+            publicsInfo = JSON.parse(await fs.promises.readFile(argv.publicsinfo, "utf8"));
         }
     }
 
