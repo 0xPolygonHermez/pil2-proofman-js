@@ -111,8 +111,6 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
 
             const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -e ${path.join(filesDir, `${air.name}.verifierinfo.json`)} -b ${path.join(filesDir, `${air.name}.verifier.bin`)} --verifier`);
             console.log(stdout3);
-
-            writeVerifierRustFile(`${filesDir}/${air.name}.verifier.rs`, setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].verifierInfo, setup[airgroup.airgroupId][air.airId].constRoot);
         }));
     }));
 

@@ -158,8 +158,6 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
 
         const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.verifierinfo.json -b ${filesDir}/${template}.verifier.bin --verifier`);
         console.log(stdout3);
-        
-        writeVerifierRustFile(`${filesDir}/${template}.verifier.rs`, setupAggregation.starkInfo, setupAggregation.verifierInfo, constRoot);
     }
 
     if(template === "recursive2") {
@@ -168,6 +166,8 @@ module.exports.genRecursiveSetup = async function genRecursiveSetup(buildDir, se
             rootCRecursive2: constRoot,
         }
         await fs.promises.writeFile(`${filesDir}/${template}.vks.json`, JSONbig.stringify(vks, 0, 1), "utf8");
+
+        writeVerifierRustFile(`${filesDir}/${template}.verifier.rs`, setupAggregation.starkInfo, setupAggregation.verifierInfo, constRoot);
     }
 
     return { constRoot, pil: pilStr, setupAggregation }

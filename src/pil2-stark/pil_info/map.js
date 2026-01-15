@@ -8,7 +8,15 @@ module.exports = function map(res, symbols, expressions, constraints, options) {
         if(constraints[i].filename === `${res.name}.ImPol`) {
             constraints[i].imPol = true;
             if(!options.recursion) {
-                constraints[i].line = printExpressions(res, expressions[constraints[i].e], expressions, true);
+                try {
+                    constraints[i].line = printExpressions(res, expressions[constraints[i].e], expressions, true);
+                } catch (e) {
+                    if (e instanceof RangeError && e.message === "Invalid string length") {
+                        constraints[i].line = "";
+                    } else {
+                        throw e;
+                    }
+                }
             } else {
                 constraints[i].line = "";
             }  
@@ -21,10 +29,17 @@ module.exports = function map(res, symbols, expressions, constraints, options) {
     const imPols = res.cmPolsMap.filter(i => i.imPol === true);
     for(let i = 0; i < imPols.length; ++i) {
         if(!options.recursion) {
-            const imPolExpression = printExpressions(res, expressions[imPols[i].expId], expressions);
+            let imPolExpression;
+            try {
+                imPolExpression = printExpressions(res, expressions[imPols[i].expId], expressions);
+            } catch (e) {
+                if (e instanceof RangeError && e.message === "Invalid string length") {
+                    imPolExpression = "";
+                } else {
+                    throw e;
+                }
+            }
             if(i > 0) console.log("------------------------------------------------------------");
-            console.log(`Intermediate polynomial ${i} columns: ${imPols[i].dim}`);
-            console.log(imPolExpression);
             if(imPols[i].dim == 1) {
                 res.imPolsInfo.baseField.push(imPolExpression);
             } else {
