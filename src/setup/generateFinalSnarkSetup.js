@@ -54,7 +54,7 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     runWitnessLibraryGeneration(buildDir, filesDir, template, template);
  
     // Generate setup
-    const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await plonk2pil(`${buildDir}/build/${template}.r1cs`, "light");
+    const {exec: execBuff, pilStr, nBits, fixedPols, airgroupName, airName } = await plonk2pil(`${buildDir}/build/${template}.r1cs`, "aggregation");
     
     await writeFixedPolsBin(`${buildDir}/build/${template}.fixed.bin`, airgroupName, airName, 1 << nBits, fixedPols);
 
@@ -70,7 +70,7 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     await fd.write(execBuff);
     await fd.close();
 
-    const starkStructSettings = { blowupFactor: 5, verificationHashType: "BN128", merkleTreeArity: 4, merkleTreeCustom: false, lastLevelVerification: 0, powBits:17 };
+    const starkStructSettings = { blowupFactor: 6, verificationHashType: "BN128", merkleTreeArity: 4, merkleTreeCustom: false, lastLevelVerification: 0, powBits:17 };
     const starkStructRecursiveF = generateStarkStruct(starkStructSettings, nBits);
 
     const airout = new AirOut(pilFile);

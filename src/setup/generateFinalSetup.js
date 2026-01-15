@@ -94,36 +94,8 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
 
     await fixedCols.saveToFile(`${filesDir}/vadcop_final.const`);
     
-    let finalSettingsPerf = { name: "vadcop_final_perf", blowupFactor: 5, foldingFactor: 4, powBits: 22, merkleTreeArity: 2, lastLevelVerification: 6, finalDegree: 9 };
-    let finalSettings = { name: "vadcop_final", blowupFactor: 6, foldingFactor: 4, powBits: 22, lastLevelVerification: 1 };
+    let finalSettings = { name: "vadcop_final", blowupFactor: 5, foldingFactor: 4, powBits: 22, lastLevelVerification: 2 };
     
-    if(finalSettingsPerf.starkStruct && finalSettingsPerf.starkStruct.nBits !== nBits) {
-        throw new Error("Final starkStruct nBits does not match with vadcop final circuit size");
-    };
-
-    let starkStructFinalPerf = generateStarkStruct(finalSettingsPerf, nBits);
-    const setupPerf = await starkSetup(air, starkStructFinalPerf, {...setupOptions, airgroupId: 0, airId: 0});
-
-    await fs.promises.writeFile(`${filesDir}/vadcop_final_perf.starkinfo.json`, JSON.stringify(setupPerf.starkInfo, null, 1), "utf8");
-    await fs.promises.writeFile(`${filesDir}/vadcop_final_perf.expressionsinfo.json`, JSON.stringify(setupPerf.expressionsInfo, null, 1), "utf8");
-    await fs.promises.writeFile(`${filesDir}/vadcop_final_perf.verifierinfo.json`, JSON.stringify(setupPerf.verifierInfo, null, 1), "utf8");
-    await exec(`${setupOptions.constTree} -c ${filesDir}/vadcop_final.const -s ${filesDir}/vadcop_final_perf.starkinfo.json -v ${filesDir}/vadcop_final_perf.verkey.json`);
-    setupPerf.constRoot = JSONbig.parse(await fs.promises.readFile(`${filesDir}/vadcop_final_perf.verkey.json`, "utf8"));
-
-    const constRootBuffer = Buffer.alloc(32);
-    for (let i = 0; i < 4; i++) {
-        constRootBuffer.writeBigUInt64LE(setupPerf.constRoot[i], i * 8);
-    }
-    await fs.promises.writeFile(`${filesDir}/vadcop_final_perf.verkey.bin`, constRootBuffer);
-
-    const { stdout: stdout2 } = await exec(`${setupOptions.binFile} -s ${filesDir}/vadcop_final_perf.starkinfo.json -e ${filesDir}/vadcop_final_perf.expressionsinfo.json -b ${filesDir}/vadcop_final_perf.bin`);
-    console.log(stdout2);
-
-    const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${filesDir}/vadcop_final_perf.starkinfo.json -e ${filesDir}/vadcop_final_perf.verifierinfo.json -b ${filesDir}/vadcop_final_perf.verifier.bin --verifier`);
-    console.log(stdout3);
-
-    writeVerifierRustFile(`${filesDir}/vadcop_final_perf.verifier.rs`, setupPerf.starkInfo, setupPerf.verifierInfo, setupPerf.constRoot);
-
     let starkStructFinal = generateStarkStruct(finalSettings, nBits);
     const setup = await starkSetup(air, starkStructFinal, {...setupOptions, airgroupId: 0, airId: 0});
 
@@ -148,10 +120,8 @@ module.exports.genFinalSetup = async function genFinalSetup(buildDir, setupOptio
 
     writeVerifierRustFile(`${filesDir}/vadcop_final.verifier.rs`, setup.starkInfo, setup.verifierInfo, setup.constRoot);
 
-    if(!setupOptions.powersOfTauFile) {
-        await witnessLibraryGenerationAwait();
-    }
+    await witnessLibraryGenerationAwait();
 
-    return {starkInfoFinal: setup.starkInfo, verifierInfoFinal: setup.verifierInfo, constRootFinal: setup.constRoot};
+    return setup;
 
 }

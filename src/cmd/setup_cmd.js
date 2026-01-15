@@ -11,13 +11,12 @@ const { AirOut } = require("../airout.js");
 const { writeGlobalConstraintsBinFile } = require("../pil2-stark/chelpers/globalConstraintsBinFile.js");
 const { starkSetup } = require('../pil2-stark/stark_setup.js');
 const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
-const { writeVerifierRustFile } = require("../pil2-stark/chelpers/binFile.js");
+const { genCompressedFinalSetup } = require('../setup/generateCompressedFinalSetup.js');
 
 const { genFinalSetup } = require("../setup/generateFinalSetup.js");
 const { genRecursiveSetup } = require("../setup/generateRecursiveSetup.js");
 const { isCompressorNeeded } = require('../setup/is_compressor_needed.js');
 const { generateStarkStruct, setAiroutInfo, log2 } = require("../setup/utils.js");
-const { genFinalSnarkSetup } = require('../setup/generateFinalSnarkSetup.js');
 const { readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
 const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
 
@@ -118,7 +117,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     
     let globalInfo;
     let globalConstraints;
-    let finalVadcopFinalSnark;
+    let finalVadcopFinal;
 
     if(proofManagerConfig.setup && proofManagerConfig.setup.genAggregationSetup) {
         const airoutInfo = await setAiroutInfo(airout);
@@ -202,7 +201,12 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             );
         };
   
-        finalVadcopFinalSnark = await genFinalSetup(buildDir, setupOptions, globalInfo, globalConstraints);
+        finalVadcopFinal = await genFinalSetup(buildDir, setupOptions, globalInfo, globalConstraints);
+
+        await genCompressedFinalSetup(
+            buildDir, globalInfo.name, setupOptions, finalVadcopFinal.constRoot, [],
+            finalVadcopFinal.starkInfo, finalVadcopFinal.verifierInfo,
+        );
 
     } else {
         const airoutInfo = await setAiroutInfo(airout);
@@ -213,19 +217,6 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     await fs.promises.writeFile(`${buildDir}/provingKey/pilout.globalInfo.json`, JSON.stringify(globalInfo, null, 1), "utf8");
     await fs.promises.writeFile(`${buildDir}/provingKey/pilout.globalConstraints.json`, JSON.stringify(globalConstraints, null, 1), "utf8");
     await writeGlobalConstraintsBinFile(globalInfo, globalConstraints, `${buildDir}/provingKey/pilout.globalConstraints.bin`);
-
-    if(proofManagerConfig.setup && proofManagerConfig.setup.genAggregationSetup && proofManagerConfig.setup.genFinalSnarkSetup) {
-        let constRootFinalSnark = finalVadcopFinalSnark.constRootFinal;
-        let starkInfoFinalSnark = finalVadcopFinalSnark.starkInfoFinal;
-        let verifierInfoFinalSnark = finalVadcopFinalSnark.verifierInfoFinal;
-
-        await genFinalSnarkSetup(
-            buildDir, globalInfo.name, setupOptions, constRootFinalSnark, [],
-            starkInfoFinalSnark, verifierInfoFinalSnark
-        );
-
-        await fs.promises.writeFile(`${buildDir}/provingKeySnark/publics_info.json`, JSON.stringify(setupOptions.publicsInfo, null, 1), "utf8");
-    }
 
     return { setup, airoutInfo: {...globalInfo, globalConstraints}, config: proofManagerConfig };
 }
