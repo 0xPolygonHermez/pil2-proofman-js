@@ -20,6 +20,7 @@ module.exports = async function setupSnarkCmd(proofManagerConfig, buildDir = "tm
         plonkSetup: path.resolve(__dirname, '../setup/build/plonkSetup'),
         stdPath: proofManagerConfig.stdPath,
         finalSnark: proofManagerConfig.finalSnark || "fflonk",
+        onlyRecursiveFinal: proofManagerConfig.onlyRecursiveFinal || false
     };
 
     // Read global info to get the name
@@ -60,8 +61,6 @@ module.exports = async function setupSnarkCmd(proofManagerConfig, buildDir = "tm
         buildDir, globalInfo.name, setupOptions, constRootFinal, [],
         starkInfoFinal, verifierInfoFinal
     );
-
-    await fs.promises.writeFile(`${buildDir}/provingKeySnark/publics_info.json`, JSON.stringify(setupOptions.publicsInfo, null, 1), "utf8");
 
     log.info("[Setup Snark Cmd]", "Final snark setup completed successfully");
 

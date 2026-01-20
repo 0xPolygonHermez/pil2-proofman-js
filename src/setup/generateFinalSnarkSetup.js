@@ -99,6 +99,12 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
 
     const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${filesDir}/${template}.starkinfo.json -e ${filesDir}/${template}.verifierinfo.json -b ${filesDir}/${template}.verifier.bin --verifier`);
     console.log(stdout3);
+
+    if (setupOptions.onlyRecursiveFinal) {
+        console.log("Skipping final snark setup generation...");
+        await witnessLibraryGenerationAwait();
+        return;
+    }
     
     template = "final";
     verifierName = "recursivef.verifier.circom";
@@ -156,6 +162,8 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     await fs.promises.writeFile(`${filesDir}/${camelCaseName}Verifier.sol`, solidityVerifier, "utf8");
     await fs.promises.writeFile(`${filesDir}/I${camelCaseName}Verifier.sol`, solidityVerifierInterface, "utf8");
     await witnessLibraryGenerationAwait();
+
+    await fs.promises.writeFile(`${buildDir}/provingKeySnark/publics_info.json`, JSON.stringify(setupOptions.publicsInfo, null, 1), "utf8");
 
     console.log("All files were generated correctly");
 
