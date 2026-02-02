@@ -58,7 +58,7 @@ module.exports = async function setupSnarkCmd(proofManagerConfig, buildDir = "tm
     await fs.promises.mkdir(`${buildDir}/provingKeySnark`, { recursive: true });
 
     await genFinalSnarkSetup(
-        buildDir, globalInfo.name, setupOptions, constRootFinal, [],
+        buildDir, globalInfo.name, setupOptions, constRootFinal,
         starkInfoFinal, verifierInfoFinal
     );
 

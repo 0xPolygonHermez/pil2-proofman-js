@@ -20,21 +20,27 @@ const { generateFixedCols } = require('../pil2-stark/witness_computation/witness
 const { writeFixedPolsBin, readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
 
 
-module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, name, setupOptions, constRoot, verificationKeys = [], starkInfo, verifierInfo) {
+module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, name, setupOptions, constRoot, starkInfo, verifierInfo) {
     let template = "recursivef";
     let verifierName = "vadcop_final.verifier.circom";
     let templateFilename = path.resolve(__dirname,"../../", `node_modules/stark-recurser/src/recursion/templates/recursivef.circom.ejs`);
     let filesDir = `${buildDir}/provingKeySnark/${template}`;
     
+    await fs.promises.writeFile(
+        `${buildDir}/provingKeySnark/vadcop_final.verkey.json`,
+        JSONbig.stringify(constRoot, null, 2),
+        "utf8"
+    );
+
     await fs.promises.mkdir(filesDir, { recursive: true });
 
-    const options = { skipMain: true, verkeyInput: false, enableInput: false, hasRecursion: false }
+    const options = { skipMain: true, verkeyInput: true, enableInput: false, hasRecursion: false }
         
     //Generate circom
     const verifierCircomTemplate = await pil2circom(constRoot, starkInfo, verifierInfo, options);
     await fs.promises.writeFile(`${buildDir}/circom/${verifierName}`, verifierCircomTemplate, "utf8");
 
-    const recursiveVerifier = await genCircom(templateFilename, [starkInfo], undefined, [verifierName], verificationKeys, [], [], options);
+    const recursiveVerifier = await genCircom(templateFilename, [starkInfo], undefined, [verifierName], [constRoot], [], [], options);
     await fs.promises.writeFile(`${buildDir}/circom/${template}.circom`, recursiveVerifier, "utf8");
  
     const circuitsGLPath = path.resolve(__dirname, '../../', 'node_modules/stark-recurser/src/pil2circom/circuits.gl');
@@ -116,7 +122,7 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     const optionsFinal = { skipMain: true, verkeyInput: false, enableInput: false, addAggregatorAddr: false }
         
     //Generate circom
-    const verifierFinalCircomTemplate = await pil2circom(setupRecursiveF.constRoot, setupRecursiveF.starkInfo, setupRecursiveF.verifierInfo, options);
+    const verifierFinalCircomTemplate = await pil2circom(setupRecursiveF.constRoot, setupRecursiveF.starkInfo, setupRecursiveF.verifierInfo, optionsFinal);
     await fs.promises.writeFile(`${buildDir}/circom/${verifierName}`, verifierFinalCircomTemplate, "utf8");
 
     const publicsHashFinal = setupOptions.publicsInfo ? setupOptions.publicsInfo : undefined;
