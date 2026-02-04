@@ -4,6 +4,7 @@ const JSONbig = require('json-bigint')({ useNativeBigInt: true, alwaysParseAsBig
 const fs = require('fs');
 const ffjavascript = require("ffjavascript");
 
+const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
 const { plonk2pil } = require('stark-recurser/src/circom2pil/plonk2pil.js');
 const { genCircom } = require('stark-recurser/src/gencircom.js');
 const { genSolidity } = require('stark-recurser/src/gensolidity.js');
@@ -85,6 +86,7 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     let fixedInfo = {};
     await readFixedPolsBin(fixedInfo, `${buildDir}/build/${template}.fixed.bin`);
     const fixedCols = generateFixedCols(air.symbols.filter(s => s.airGroupId == 0), air.numRows);
+    await getFixedPolsPil2(airout.airGroups[0].name, air, fixedCols, fixedInfo);
 
     await fixedCols.saveToFile(`${filesDir}/${template}.const`);
     
