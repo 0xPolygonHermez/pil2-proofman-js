@@ -166,7 +166,7 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     await fs.promises.writeFile(`${filesDir}/${snarkVerifierSolidity}.sol`, snarkVerifier, "utf8");
     
     const camelCaseName = name.charAt(0).toUpperCase() + name.slice(1);
-    const {solidityVerifier, solidityVerifierInterface} = await genSolidity(name, publicsHashFinal, setupOptions.finalSnark == "fflonk");
+    const {solidityVerifier, solidityVerifierInterface} = await genSolidity(name, constRoot, publicsHashFinal, setupOptions.finalSnark == "fflonk");
     await fs.promises.writeFile(`${filesDir}/${camelCaseName}Verifier.sol`, solidityVerifier, "utf8");
     await fs.promises.writeFile(`${filesDir}/I${camelCaseName}Verifier.sol`, solidityVerifierInterface, "utf8");
     await witnessLibraryGenerationAwait();
