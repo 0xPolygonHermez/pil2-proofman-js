@@ -1,3 +1,5 @@
+'use strict';
+
 const fs = require('fs');
 const crypto = require('crypto');
 const util = require('util');
@@ -20,17 +22,13 @@ const { generateStarkStruct, setAiroutInfo, log2 } = require("../setup/utils.js"
 const { readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
 const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
 
-
-// NOTE: by the moment this is a STARK setup process, it should be a generic setup process?
-module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
-    const airout = new AirOut(proofManagerConfig.airout.airoutFilename);
-
-    const setupOptions = {
+function buildSetupOptions(proofManagerConfig) {
+    return {
         optImPols: (proofManagerConfig.setup && proofManagerConfig.setup.optImPols) || false,
-        constTree: process.platform === 'darwin' 
+        constTree: process.platform === 'darwin'
             ? path.resolve(__dirname, '../setup/build/bctree_mac')
             : path.resolve(__dirname, '../setup/build/bctree'),
-        binFile: process.platform === 'darwin' 
+        binFile: process.platform === 'darwin'
             ? path.resolve(__dirname, '../setup/build/binfile_mac')
             : path.resolve(__dirname, '../setup/build/binfile'),
         publicsInfo: proofManagerConfig.setup && proofManagerConfig.setup.publicsInfo,
@@ -42,20 +40,28 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         fixedPath: proofManagerConfig.setup && proofManagerConfig.setup.fixedPath,
         finalSnark: proofManagerConfig.setup && proofManagerConfig.setup.finalSnark,
     };
-    
-    let setup = [];
+}
+
+// ---------------------------------------------------------------------------
+// Part 1
+// Returns: setup[][]  where setup[airgroupId][airId] = { starkInfo, verifierInfo,
+//          expressionsInfo, ... }  (plain JSON, no BigInt values yet)
+// ---------------------------------------------------------------------------
+async function setupPart1(proofManagerConfig, buildDir) {
+    const airout = new AirOut(proofManagerConfig.airout.airoutFilename);
+    const setupOptions = buildSetupOptions(proofManagerConfig);
 
     let starkStructs = [];
 
     let fixedInfo = {};
     if (!setupOptions.fixedPath) {
-        for(let i = 0; i < setupOptions.binFiles.length; ++i) {
+        for (let i = 0; i < setupOptions.binFiles.length; ++i) {
             await readFixedPolsBin(fixedInfo, setupOptions.binFiles[i]);
         }
     }
 
     await Promise.all(airout.airGroups.map(async (airgroup) => {
-        setup[airgroup.airgroupId] = [];
+        starkStructs[airgroup.airgroupId] = [];
 
         await Promise.all(airgroup.airs.map(async (air) => {
             log.info("[Setup Cmd]", `··· Computing setup for air '${air.name}'`);
@@ -64,7 +70,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             if (proofManagerConfig.setup && proofManagerConfig.setup.settings) {
                 settings = proofManagerConfig.setup.settings[`${air.name}`]
                     || proofManagerConfig.setup.settings.default
-                    || { };
+                    || {};
             }
 
             if (!settings) {
@@ -79,8 +85,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             const filesDir = path.join(buildDir, "provingKey", airout.name, airgroup.name, "airs", `${air.name}`, "air");
             await fs.promises.mkdir(filesDir, { recursive: true });
 
-            let starkStruct = settings.starkStruct || generateStarkStruct(settings, log2(air.numRows));
-            starkStructs.push(starkStruct);
+            starkStructs[airgroup.airgroupId][air.airId] = settings.starkStruct || generateStarkStruct(settings, log2(air.numRows));
 
             if (!setupOptions.fixedPath) {
                 const fixedPols = generateFixedCols(air.symbols.filter(s => s.airGroupId == airgroup.airgroupId), air.numRows);
@@ -89,8 +94,30 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             } else {
                 await exec(`cp ${setupOptions.fixedPath}/${air.name}.fixed ${path.join(filesDir, `${air.name}.const`)}`);
             }
+        }));
+    }));
 
-            setup[airgroup.airgroupId][air.airId] = await starkSetup(air, starkStruct, setupOptions);
+    return starkStructs;
+}
+
+// ---------------------------------------------------------------------------
+// Part 2
+// Receives: starkStructs[][] from Part 1 (or from Rust once ported)
+// ---------------------------------------------------------------------------
+async function setupPart2(proofManagerConfig, buildDir, starkStructs) {
+    const airout = new AirOut(proofManagerConfig.airout.airoutFilename);
+    const setupOptions = buildSetupOptions(proofManagerConfig);
+
+    let setup = [];
+
+    await Promise.all(airout.airGroups.map(async (airgroup) => {
+        setup[airgroup.airgroupId] = [];
+
+        await Promise.all(airgroup.airs.map(async (air) => {
+            const filesDir = path.join(buildDir, "provingKey", airout.name, airgroup.name, "airs", `${air.name}`, "air");
+
+            setup[airgroup.airgroupId][air.airId] = await starkSetup(air, starkStructs[airgroup.airgroupId][air.airId], setupOptions);
+
             await fs.promises.writeFile(path.join(filesDir, `${air.name}.starkinfo.json`), JSON.stringify(setup[airgroup.airgroupId][air.airId].starkInfo, null, 1), "utf8");
             await fs.promises.writeFile(path.join(filesDir, `${air.name}.verifierinfo.json`), JSON.stringify(setup[airgroup.airgroupId][air.airId].verifierInfo, null, 1), "utf8");
             await fs.promises.writeFile(path.join(filesDir, `${air.name}.expressionsinfo.json`), JSON.stringify(setup[airgroup.airgroupId][air.airId].expressionsInfo, null, 1), "utf8");
@@ -123,7 +150,7 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         const airoutInfo = await setAiroutInfo(airout);
         globalConstraints = airoutInfo.globalConstraints;
         globalInfo = airoutInfo.vadcopInfo;
-                
+    
         let recursiveSettings =  { blowupFactor: 3, lastLevelVerification: 1 };
         if(proofManagerConfig.setup && proofManagerConfig.setup.settings && proofManagerConfig.setup.settings.recursive) {
         recursiveSettings = proofManagerConfig.setup.settings.recursive;
@@ -138,13 +165,12 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         for(const airgroup of airout.airGroups) {
             setupsAggregation[airgroup.airgroupId] = null;
             constRootsRecursives1[airgroup.airgroupId] = [];
-    
+
             for(const air of airgroup.airs) {
                 log.info("[Setup Cmd]", `······ Checking if air '${air.name}' needs a compressor`);
-                        
+
                 const filesDir = path.join(buildDir, "provingKey", airout.name, airgroup.name, "airs", `${air.name}`, "air");
 
-                
                 let compressorNeeded = false;
                 if (proofManagerConfig.setup && proofManagerConfig.setup.settings && proofManagerConfig.setup.settings[`${air.name}`] && proofManagerConfig.setup.settings[`${air.name}`].hasCompressor) {
                     compressorNeeded = true;
@@ -156,20 +182,20 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
                         path.join(filesDir, `${air.name}.starkinfo.json`),
                     );
                 }
-            
+
                 let constRoot, starkInfo, verifierInfo;
                 const starkStructRecursive1 = { ...starkStructRecursive };
-            
+
                 if (compressorNeeded) {
                     setup[airgroup.airgroupId][air.airId].hasCompressor = true;
                     globalInfo.airs[airgroup.airgroupId][air.airId].hasCompressor = true;
-                                
+
                     const recursiveSetup = await genRecursiveSetup(
                         buildDir, setupOptions, "compressor", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
                         setup[airgroup.airgroupId][air.airId].constRoot, [], setup[airgroup.airgroupId][air.airId].starkInfo,
                         setup[airgroup.airgroupId][air.airId].verifierInfo, null
                     );
-                    
+
                     constRoot = recursiveSetup.constRoot;
                     starkInfo = recursiveSetup.setupAggregation.starkInfo;
                     verifierInfo = recursiveSetup.setupAggregation.verifierInfo;
@@ -179,7 +205,6 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
                     verifierInfo = setup[airgroup.airgroupId][air.airId].verifierInfo;
                     starkStructRecursive1.hashCommits = true;
                 }
-            
                 const setupRecursive1 = await genRecursiveSetup(
                     buildDir, setupOptions, "recursive1", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
                     constRoot, [], starkInfo, verifierInfo, starkStructRecursive,
@@ -188,7 +213,6 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
 
                 setupsAggregation[airgroup.airgroupId] = setupRecursive1.setupAggregation;
                 constRootsRecursives1[airgroup.airgroupId][air.airId] = setupRecursive1.constRoot;
-
             };
         };
 
@@ -220,3 +244,11 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
 
     return { setup, airoutInfo: {...globalInfo, globalConstraints}, config: proofManagerConfig };
 }
+
+module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
+    const starkStructs = await setupPart1(proofManagerConfig, buildDir);
+    return await setupPart2(proofManagerConfig, buildDir, starkStructs);
+}
+
+module.exports.setupPart1 = setupPart1;
+module.exports.setupPart2 = setupPart2;

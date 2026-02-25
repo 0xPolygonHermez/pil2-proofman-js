@@ -1,84 +1,99 @@
 'use strict';
 
 /**
- * Wrapper script for Rust↔JS interop.
+ * Wrapper for Rust↔JS interop — bidirectional line-delimited JSON protocol.
  *
- * Protocol (line-delimited JSON on stdout):
- *   Rust → Node  (stdin):  { "type": "call", "fn": "setup", "args": { "config": {...}, "buildDir": "..." } }
- *   Node → Rust  (stdout): { "type": "log",    "level": "info|warn|error", "msg": "..." }
- *                          { "type": "result",  "ok": true }
- *                          { "type": "error",   "message": "...", "stack": "..." }
+ * Each line on stdin  is a JSON request:
+ *   { "type": "call", "fn": "setup_part1"|"setup_part2", "id": <n>, "args": { ... } }
  *
- * All regular console output is redirected to stderr so stdout stays clean for the protocol.
- * In the future, JS can request Rust work via:
- *   Node → Rust  (stdout): { "type": "rust_call", "id": 1, "fn": "...", "args": {...} }
- *   Rust → Node  (stdin):  { "type": "rust_result", "id": 1, "value": {...} }
+ * Each line on stdout is a JSON response:
+ *   { "type": "result", "id": <n>, "ok": true,  "value": <any> }
+ *   { "type": "result", "id": <n>, "ok": false }
+ *   { "type": "error",  "id": <n>, "message": "...", "stack": "..." }
+ *   { "type": "log",               "level": "info|warn|error", "msg": "..." }
+ *
+ * setup_part1 → returns plain JSON (no BigInt yet, constRoot not computed)
+ * setup_part2 → no return value; all output is written to disk
+ *
+ * Future: JS can request Rust work via:
+ *   { "type": "rust_call", "id": <n>, "fn": "...", "args": { ... } }
+ *   Rust replies on stdin:
+ *   { "type": "rust_result", "id": <n>, "value": { ... } }
  */
 
-const setupCmd = require('./setup_cmd');
+const readline = require('readline');
+const { setupPart1, setupPart2 } = require('./setup_cmd');
 
-// --- stdout helpers ---------------------------------------------------------
-
-const proto = {
-    log(level, msg) {
-        process.stdout.write(JSON.stringify({ type: 'log', level, msg }) + '\n');
-    },
-    result(ok) {
-        process.stdout.write(JSON.stringify({ type: 'result', ok }) + '\n');
-    },
-    error(message, stack) {
-        process.stdout.write(JSON.stringify({ type: 'error', message, stack: stack || null }) + '\n');
-    },
-};
-
-// Redirect all console output to stderr so stdout stays clean for the protocol.
+// ---------------------------------------------------------------------------
+// Redirect all console output to stderr — stdout is reserved for the protocol.
+// ---------------------------------------------------------------------------
 console.log   = (...args) => process.stderr.write(args.join(' ') + '\n');
 console.info  = (...args) => process.stderr.write('[INFO]  ' + args.join(' ') + '\n');
 console.warn  = (...args) => process.stderr.write('[WARN]  ' + args.join(' ') + '\n');
 console.error = (...args) => process.stderr.write('[ERROR] ' + args.join(' ') + '\n');
 
 // ---------------------------------------------------------------------------
+// Protocol helpers
+// ---------------------------------------------------------------------------
+const proto = {
+    result(id, value) {
+        const msg = value !== undefined
+            ? { type: 'result', id, ok: true, value }
+            : { type: 'result', id, ok: true };
+        process.stdout.write(JSON.stringify(msg) + '\n');
+    },
+    error(id, message, stack) {
+        process.stdout.write(JSON.stringify({ type: 'error', id, message, stack: stack || null }) + '\n');
+    },
+};
 
-async function readStdin() {
-    return new Promise((resolve, reject) => {
-        let data = '';
-        process.stdin.setEncoding('utf8');
-        process.stdin.on('data', chunk => { data += chunk; });
-        process.stdin.on('end', () => resolve(data));
-        process.stdin.on('error', reject);
-    });
+// ---------------------------------------------------------------------------
+// Request handlers
+// ---------------------------------------------------------------------------
+async function handleSetupPart1(id, { config, buildDir }) {
+    const setup = await setupPart1(config, buildDir);
+    // setup contains plain JSON (starkInfo, verifierInfo, expressionsInfo).
+    // No BigInt values at this point — constRoot is only added in Part 2.
+    proto.result(id, setup);
 }
 
+async function handleSetupPart2(id, { config, buildDir, starkStructs }) {
+    await setupPart2(config, buildDir, starkStructs);
+    proto.result(id);
+}
+
+// ---------------------------------------------------------------------------
+// Main loop: read requests line by line from stdin
+// ---------------------------------------------------------------------------
 async function main() {
-    let raw;
-    try {
-        raw = await readStdin();
-    } catch (err) {
-        proto.error('Failed to read stdin: ' + err.message, err.stack);
-        process.exit(1);
-    }
+    const rl = readline.createInterface({ input: process.stdin, terminal: false });
 
-    let message;
-    try {
-        message = JSON.parse(raw);
-    } catch (err) {
-        proto.error('Failed to parse stdin JSON: ' + err.message);
-        process.exit(1);
-    }
+    for await (const line of rl) {
+        if (!line.trim()) continue;
 
-    if (message.type !== 'call' || message.fn !== 'setup') {
-        proto.error(`Unexpected message: ${JSON.stringify(message)}`);
-        process.exit(1);
-    }
+        let request;
+        try {
+            request = JSON.parse(line);
+        } catch (err) {
+            // Malformed line — send an error without an id
+            proto.error(null, 'Failed to parse request: ' + err.message);
+            process.exit(1);
+        }
 
-    const { config, buildDir } = message.args;
+        const { id, fn, args } = request;
 
-    try {
-        await setupCmd(config, buildDir);
-        proto.result(true);
-    } catch (err) {
-        proto.error(err.message, err.stack);
-        process.exit(1);
+        try {
+            if (fn === 'setup_part1') {
+                await handleSetupPart1(id, args);
+            } else if (fn === 'setup_part2') {
+                await handleSetupPart2(id, args);
+            } else {
+                throw new Error(`Unknown function: ${fn}`);
+            }
+        } catch (err) {
+            proto.error(id, err.message, err.stack);
+            process.exit(1);
+        }
     }
 }
 
