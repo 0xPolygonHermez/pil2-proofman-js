@@ -42,12 +42,8 @@ function buildSetupOptions(proofManagerConfig) {
     };
 }
 
-// ---------------------------------------------------------------------------
-// Part 1
-// Returns: setup[][]  where setup[airgroupId][airId] = { starkInfo, verifierInfo,
-//          expressionsInfo, ... }  (plain JSON, no BigInt values yet)
-// ---------------------------------------------------------------------------
-async function setupPart1(proofManagerConfig, buildDir) {
+// Generate starkStructs
+async function generateStarkStructs(proofManagerConfig, buildDir) {
     const airout = new AirOut(proofManagerConfig.airout.airoutFilename);
     const setupOptions = buildSetupOptions(proofManagerConfig);
 
@@ -100,11 +96,8 @@ async function setupPart1(proofManagerConfig, buildDir) {
     return starkStructs;
 }
 
-// ---------------------------------------------------------------------------
-// Part 2
-// Receives: starkStructs[][] from Part 1 (or from Rust once ported)
-// ---------------------------------------------------------------------------
-async function setupPart2(proofManagerConfig, buildDir, starkStructs) {
+// Stark Setup
+async function genStarkSetup(proofManagerConfig, buildDir, starkStructs) {
     const airout = new AirOut(proofManagerConfig.airout.airoutFilename);
     const setupOptions = buildSetupOptions(proofManagerConfig);
 
@@ -140,33 +133,49 @@ async function setupPart2(proofManagerConfig, buildDir, starkStructs) {
         }));
     }));
 
-    setupOptions.optImPols = false;
-    
+    return setup;
+}
+
+// Aggregation/recursive circuit generation
+async function genCircuits(proofManagerConfig, buildDir, setup) {
+    const airout = new AirOut(proofManagerConfig.airout.airoutFilename);
+
+    // constRoot elements may arrive as Number after a JSON round-trip through Rust;
+    // restore them to BigInt so downstream code (writeBigUInt64LE, etc.) works correctly.
+    for (const airgroup of airout.airGroups) {
+        for (const air of airgroup.airs) {
+            const s = setup[airgroup.airgroupId]?.[air.airId];
+            if (s?.constRoot) s.constRoot = s.constRoot.map(v => BigInt(v));
+        }
+    }
+
     let globalInfo;
     let globalConstraints;
-    let finalVadcopFinal;
 
-    if(proofManagerConfig.setup && proofManagerConfig.setup.genAggregationSetup) {
+    const setupOptions = buildSetupOptions(proofManagerConfig);
+    setupOptions.optImPols = false;
+
+    if (proofManagerConfig.setup && proofManagerConfig.setup.genAggregationSetup) {
         const airoutInfo = await setAiroutInfo(airout);
         globalConstraints = airoutInfo.globalConstraints;
         globalInfo = airoutInfo.vadcopInfo;
-    
-        let recursiveSettings =  { blowupFactor: 3, lastLevelVerification: 1 };
-        if(proofManagerConfig.setup && proofManagerConfig.setup.settings && proofManagerConfig.setup.settings.recursive) {
-        recursiveSettings = proofManagerConfig.setup.settings.recursive;
+
+        let recursiveSettings = { blowupFactor: 3, lastLevelVerification: 1 };
+        if (proofManagerConfig.setup && proofManagerConfig.setup.settings && proofManagerConfig.setup.settings.recursive) {
+            recursiveSettings = proofManagerConfig.setup.settings.recursive;
         }
 
         let recursiveBits = 17;
         let starkStructRecursive = recursiveSettings.starkStruct || generateStarkStruct(recursiveSettings, recursiveBits);
 
         const constRootsRecursives1 = [];
-
         const setupsAggregation = [];
-        for(const airgroup of airout.airGroups) {
+
+        for (const airgroup of airout.airGroups) {
             setupsAggregation[airgroup.airgroupId] = null;
             constRootsRecursives1[airgroup.airgroupId] = [];
 
-            for(const air of airgroup.airs) {
+            for (const air of airgroup.airs) {
                 log.info("[Setup Cmd]", `······ Checking if air '${air.name}' needs a compressor`);
 
                 const filesDir = path.join(buildDir, "provingKey", airout.name, airgroup.name, "airs", `${air.name}`, "air");
@@ -205,6 +214,7 @@ async function setupPart2(proofManagerConfig, buildDir, starkStructs) {
                     verifierInfo = setup[airgroup.airgroupId][air.airId].verifierInfo;
                     starkStructRecursive1.hashCommits = true;
                 }
+
                 const setupRecursive1 = await genRecursiveSetup(
                     buildDir, setupOptions, "recursive1", airgroup.name, airgroup.airgroupId, air.airId, globalInfo,
                     constRoot, [], starkInfo, verifierInfo, starkStructRecursive,
@@ -213,42 +223,49 @@ async function setupPart2(proofManagerConfig, buildDir, starkStructs) {
 
                 setupsAggregation[airgroup.airgroupId] = setupRecursive1.setupAggregation;
                 constRootsRecursives1[airgroup.airgroupId][air.airId] = setupRecursive1.constRoot;
-            };
-        };
+            }
+        }
 
-        for(const airgroup of airout.airGroups) {
+        for (const airgroup of airout.airGroups) {
             await genRecursiveSetup(
                 buildDir, setupOptions, "recursive2", airgroup.name, airgroup.airgroupId,
                 undefined, globalInfo, [], constRootsRecursives1[airgroup.airgroupId],
                 setupsAggregation[airgroup.airgroupId].starkInfo, setupsAggregation[airgroup.airgroupId].verifierInfo,
                 starkStructRecursive, false, setupsAggregation[airgroup.airgroupId]
             );
-        };
-  
-        finalVadcopFinal = await genFinalSetup(buildDir, setupOptions, globalInfo, globalConstraints);
+        }
+
+        const finalVadcopFinal = await genFinalSetup(buildDir, setupOptions, globalInfo, globalConstraints);
 
         await genCompressedFinalSetup(
             buildDir, globalInfo.name, setupOptions, finalVadcopFinal.constRoot, [],
             finalVadcopFinal.starkInfo, finalVadcopFinal.verifierInfo,
         );
-
     } else {
         const airoutInfo = await setAiroutInfo(airout);
         globalInfo = airoutInfo.vadcopInfo;
         globalConstraints = airoutInfo.globalConstraints;
     }
 
+    return { globalInfo, globalConstraints };
+}
+
+// Write global info and constraints files to disk
+async function writeGlobalData(buildDir, globalInfo, globalConstraints) {
     await fs.promises.writeFile(`${buildDir}/provingKey/pilout.globalInfo.json`, JSON.stringify(globalInfo, null, 1), "utf8");
     await fs.promises.writeFile(`${buildDir}/provingKey/pilout.globalConstraints.json`, JSON.stringify(globalConstraints, null, 1), "utf8");
     await writeGlobalConstraintsBinFile(globalInfo, globalConstraints, `${buildDir}/provingKey/pilout.globalConstraints.bin`);
-
-    return { setup, airoutInfo: {...globalInfo, globalConstraints}, config: proofManagerConfig };
 }
 
 module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
-    const starkStructs = await setupPart1(proofManagerConfig, buildDir);
-    return await setupPart2(proofManagerConfig, buildDir, starkStructs);
+    const starkStructs = await generateStarkStructs(proofManagerConfig, buildDir);
+    const setup = await starkSetup(proofManagerConfig, buildDir, starkStructs);
+    const { globalInfo, globalConstraints } = await genCircuits(proofManagerConfig, buildDir, setup);
+    await writeGlobalData(buildDir, globalInfo, globalConstraints);
+    return { setup, airoutInfo: { ...globalInfo, globalConstraints }, config: proofManagerConfig };
+
 }
 
-module.exports.setupPart1 = setupPart1;
-module.exports.setupPart2 = setupPart2;
+module.exports.genStarkSetup = genStarkSetup;
+module.exports.genCircuits = genCircuits;
+module.exports.writeGlobalData = writeGlobalData;

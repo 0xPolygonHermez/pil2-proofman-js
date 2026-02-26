@@ -17,7 +17,8 @@
  */
 
 const readline = require('readline');
-const { setupPart1, setupPart2 } = require('./setup_cmd');
+const JSONbig = require('json-bigint')({ useNativeBigInt: true });
+const { genStarkSetup, genCircuits, writeGlobalData } = require('./setup_cmd');
 
 // ---------------------------------------------------------------------------
 // Redirect all console output to stderr — stdout is reserved for the protocol.
@@ -35,7 +36,8 @@ const proto = {
         const msg = value !== undefined
             ? { type: 'result', ok: true, value }
             : { type: 'result', ok: true };
-        process.stdout.write(JSON.stringify(msg) + '\n');
+        // JSONbig.stringify handles BigInt values (e.g. constRoot) that JSON.stringify cannot.
+        process.stdout.write(JSONbig.stringify(msg) + '\n');
     },
     error(message, stack) {
         process.stdout.write(JSON.stringify({ type: 'error', message, stack: stack || null }) + '\n');
@@ -45,15 +47,18 @@ const proto = {
 // ---------------------------------------------------------------------------
 // Request handlers
 // ---------------------------------------------------------------------------
-async function handleSetupPart1({ config, buildDir }) {
-    const setup = await setupPart1(config, buildDir);
-    // setup contains plain JSON (starkInfo, verifierInfo, expressionsInfo).
-    // No BigInt values at this point — constRoot is only added in Part 2.
+async function handleStarkSetup({ config, buildDir, starkStructs }) {
+    const setup = await genStarkSetup(config, buildDir, starkStructs);
     proto.result(setup);
 }
 
-async function handleSetupPart2({ config, buildDir, starkStructs }) {
-    await setupPart2(config, buildDir, starkStructs);
+async function handleGenerateCircuits({ config, buildDir, setup }) {
+    const result = await genCircuits(config, buildDir, setup);
+    proto.result(result);
+}
+
+async function handleWriteGlobalData({ buildDir, globalInfo, globalConstraints }) {
+    await writeGlobalData(buildDir, globalInfo, globalConstraints);
     proto.result();
 }
 
@@ -77,10 +82,12 @@ async function main() {
         const { fn, args } = request;
 
         try {
-            if (fn === 'setup_part1') {
-                await handleSetupPart1(args);
-            } else if (fn === 'setup_part2') {
-                await handleSetupPart2(args);
+            if (fn === 'stark_setup') {
+                await handleStarkSetup(args);
+            } else if (fn === 'generate_circuits') {
+                await handleGenerateCircuits(args);
+            } else if (fn === 'write_global_data') {
+                await handleWriteGlobalData(args);
             } else {
                 throw new Error(`Unknown function: ${fn}`);
             }
