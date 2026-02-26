@@ -77,7 +77,7 @@ module.exports.genFinalSnarkSetup = async function genFinalSnarkSetup(buildDir, 
     await fd.write(execBuff);
     await fd.close();
 
-    const starkStructSettings = { blowupFactor: 6, verificationHashType: "BN128", merkleTreeArity: 4, merkleTreeCustom: false, lastLevelVerification: 0, powBits:17 };
+    const starkStructSettings = { blowupFactor: 6, verificationHashType: "BN128", merkleTreeArity: 4, merkleTreeCustom: false, lastLevelVerification: 0, powBits:17, finalDegree: 7 };
     const starkStructRecursiveF = generateStarkStruct(starkStructSettings, nBits);
 
     const airout = new AirOut(pilFile);

@@ -31,7 +31,7 @@ function generateStarkStruct(settings, nBits) {
     
     if(verificationHashType === "BN128") {
         starkStruct.merkleTreeArity = settings.merkleTreeArity || 16;
-        starkStruct.transcriptArity = 8;
+        starkStruct.transcriptArity = 4;
         starkStruct.merkleTreeCustom = settings.merkleTreeCustom || false;
         hashCommits = false;
         starkStruct.lastLevelVerification = 0;
