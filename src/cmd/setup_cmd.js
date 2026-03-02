@@ -103,11 +103,26 @@ async function genStarkSetup(proofManagerConfig, buildDir, starkStructs) {
 
     let setup = [];
 
+    // binFiles case: read fixed polynomial data upfront (fixedPath case is handled in Rust)
+    let fixedInfo = {};
+    if (!setupOptions.fixedPath && setupOptions.binFiles) {
+        for (let i = 0; i < setupOptions.binFiles.length; ++i) {
+            await readFixedPolsBin(fixedInfo, setupOptions.binFiles[i]);
+        }
+    }
+
     await Promise.all(airout.airGroups.map(async (airgroup) => {
         setup[airgroup.airgroupId] = [];
 
         await Promise.all(airgroup.airs.map(async (air) => {
             const filesDir = path.join(buildDir, "provingKey", airout.name, airgroup.name, "airs", `${air.name}`, "air");
+
+            // binFiles case: generate and save the .const file (fixedPath case handled in Rust)
+            if (!setupOptions.fixedPath) {
+                const fixedPols = generateFixedCols(air.symbols.filter(s => s.airGroupId == airgroup.airgroupId), air.numRows);
+                await getFixedPolsPil2(airgroup.name, air, fixedPols, fixedInfo);
+                await fixedPols.saveToFile(path.join(filesDir, `${air.name}.const`));
+            }
 
             setup[airgroup.airgroupId][air.airId] = await starkSetup(air, starkStructs[airgroup.airgroupId][air.airId], setupOptions);
 
