@@ -11,13 +11,12 @@ const { AirOut } = require("../airout.js");
 const { writeGlobalConstraintsBinFile } = require("../pil2-stark/chelpers/globalConstraintsBinFile.js");
 const { starkSetup } = require('../pil2-stark/stark_setup.js');
 const { generateFixedCols } = require('../pil2-stark/witness_computation/witness_calculator.js');
-const { writeVerifierRustFile } = require("../pil2-stark/chelpers/binFile.js");
+const { genCompressedFinalSetup } = require('../setup/generateCompressedFinalSetup.js');
 
 const { genFinalSetup } = require("../setup/generateFinalSetup.js");
 const { genRecursiveSetup } = require("../setup/generateRecursiveSetup.js");
 const { isCompressorNeeded } = require('../setup/is_compressor_needed.js');
 const { generateStarkStruct, setAiroutInfo, log2 } = require("../setup/utils.js");
-const { genFinalSnarkSetup } = require('../setup/generateFinalSnarkSetup.js');
 const { readFixedPolsBin } = require('../pil2-stark/witness_computation/fixed_cols.js');
 const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
 
@@ -37,9 +36,11 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
         publicsInfo: proofManagerConfig.setup && proofManagerConfig.setup.publicsInfo,
         powersOfTauFile: proofManagerConfig.setup && proofManagerConfig.setup.powersOfTauFile,
         fflonkSetup: path.resolve(__dirname, '../setup/build/fflonkSetup'),
+        plonkSetup: path.resolve(__dirname, '../setup/build/plonkSetup'),
         binFiles: proofManagerConfig.setup && proofManagerConfig.setup.binFiles,
         stdPath: proofManagerConfig.setup && proofManagerConfig.setup.stdPath,
         fixedPath: proofManagerConfig.setup && proofManagerConfig.setup.fixedPath,
+        finalSnark: proofManagerConfig.setup && proofManagerConfig.setup.finalSnark,
     };
     
     let setup = [];
@@ -109,8 +110,6 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
 
             const { stdout: stdout3 } = await exec(`${setupOptions.binFile} -s ${path.join(filesDir, `${air.name}.starkinfo.json`)} -e ${path.join(filesDir, `${air.name}.verifierinfo.json`)} -b ${path.join(filesDir, `${air.name}.verifier.bin`)} --verifier`);
             console.log(stdout3);
-
-            writeVerifierRustFile(`${filesDir}/${air.name}.verifier.rs`, setup[airgroup.airgroupId][air.airId].starkInfo, setup[airgroup.airgroupId][air.airId].verifierInfo, setup[airgroup.airgroupId][air.airId].constRoot);
         }));
     }));
 
@@ -118,7 +117,8 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
     
     let globalInfo;
     let globalConstraints;
-    
+    let finalVadcopFinal;
+
     if(proofManagerConfig.setup && proofManagerConfig.setup.genAggregationSetup) {
         const airoutInfo = await setAiroutInfo(airout);
         globalConstraints = airoutInfo.globalConstraints;
@@ -201,41 +201,13 @@ module.exports = async function setupCmd(proofManagerConfig, buildDir = "tmp") {
             );
         };
   
-        let finalSettings; 
-        if(!proofManagerConfig.setup.genFinalSnarkSetup) {
-            finalSettings = {
-                blowupFactor: 5, 
-                foldingFactor: 4, 
-                powBits: 22, 
-                merkleTreeArity: 2,
-                lastLevelVerification: 6,
-                finalDegree: 9
-            }
-        } else {
-            finalSettings = {
-                blowupFactor: 6, 
-                foldingFactor: 4, 
-                powBits: 22,
-                lastLevelVerification: 1
-            }
-        }
-        if(proofManagerConfig.setup && proofManagerConfig.setup.settings && proofManagerConfig.setup.settings.final) {
-            finalSettings = proofManagerConfig.setup.settings.final;
-        }
+        finalVadcopFinal = await genFinalSetup(buildDir, setupOptions, globalInfo, globalConstraints);
 
-        const {starkInfoFinal,
-            constRootFinal,
-            verifierInfoFinal,
-        } = await genFinalSetup(buildDir, setupOptions, finalSettings, globalInfo, globalConstraints, 62);
-        
-        if(proofManagerConfig.setup.genFinalSnarkSetup) {
-            await genFinalSnarkSetup(
-                buildDir, setupOptions, globalInfo, constRootFinal, [],
-                starkInfoFinal, verifierInfoFinal,
-                12,
-            );
-        }
-        
+        await genCompressedFinalSetup(
+            buildDir, globalInfo.name, setupOptions, finalVadcopFinal.constRoot, [],
+            finalVadcopFinal.starkInfo, finalVadcopFinal.verifierInfo,
+        );
+
     } else {
         const airoutInfo = await setAiroutInfo(airout);
         globalInfo = airoutInfo.vadcopInfo;
