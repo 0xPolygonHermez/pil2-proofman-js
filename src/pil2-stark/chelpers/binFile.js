@@ -21,7 +21,7 @@ module.exports.writeStringToFile = async function writeStringToFile(fd, str) {
 }
 
 module.exports.writeVerifierExpressionsBinFile = async function writeVerifierExpressionsBinFile(cHelpersFilename, starkInfo, verifierInfo) {
-    console.log("> Writing the chelpers verifier file");
+    console.log("> Writing chelpers verifier file");
         
     const binFileInfo = await prepareVerifierExpressionsBin(starkInfo, verifierInfo);
 
@@ -39,7 +39,7 @@ module.exports.writeVerifierExpressionsBinFile = async function writeVerifierExp
 }
 
 module.exports.writeVerifierRustFile = async function writeVerifierRustFile(verifierFilename, starkInfo, verifierInfo, verkeyRoot) {
-    console.log("> Writing the chelpers verifier file");
+    console.log("> Writing rust verifier file");
         
     const rustVerifier = await prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot);
 
