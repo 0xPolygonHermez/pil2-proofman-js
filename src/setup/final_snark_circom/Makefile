@@ -4,7 +4,7 @@ WITNESS_FILE ?= libwitness.so
 BUILD_DIR := ./build
 
 CXX := g++
-CXXFLAGS := -std=c++17 -Wall -pthread -flarge-source-files -Wno-unused-label -rdynamic -mavx2 -O3 #-Wfatal-errors
+CXXFLAGS := -std=c++17 -Wall -pthread -flarge-source-files -Wno-unused-label -rdynamic -mavx2 -O1 #-Wfatal-errors
 CXXFLAGS_EXT := -fPIC
 CFLAGS := -fopenmp -Wno-unused-variable
 
