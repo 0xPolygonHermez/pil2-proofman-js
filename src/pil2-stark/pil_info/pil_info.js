@@ -67,8 +67,31 @@ module.exports = async function pilInfo(pil, starkStruct, options = {}) {
     let nColumnsBaseField = 0;
     let nColumns = 0;
     summary = `nBits: ${res.starkStruct.nBits} | blowUpFactor: ${res.starkStruct.nBitsExt - res.starkStruct.nBits} | maxConstraintDegree: ${res.qDeg + 1} `;
-    console.log(`Columns fixed: ${res.mapSectionsN.const} -> Columns in the basefield: ${res.mapSectionsN.const}`);
-    summary += `| Fixed: ${res.mapSectionsN.const} `;  
+    
+    // Handle fixed columns (stage 0) separately
+    let fixedEvals = 0;
+    let fixedOpeningPoints = new Set();
+    if(res.evMap) {
+        const fixedEvalsArray = res.evMap.filter(ev => {
+            if(ev.type === "const") {
+                const symbol = symbols.find(s => s.polId === ev.id && s.type === "fixed");
+                if(symbol) {
+                    fixedOpeningPoints.add(ev.openingPos);
+                    return true;
+                }
+            }
+            return false;
+        });
+        fixedEvals = fixedEvalsArray.length;
+    }
+    
+    console.log(`Columns fixed: ${res.mapSectionsN.const} -> Columns in the basefield: ${res.mapSectionsN.const} | Openings: ${fixedOpeningPoints.size} | Evals: ${fixedEvals}`);
+    summary += `| Fixed: ${res.mapSectionsN.const} `;
+    
+    // Initialize counters for per-stage info
+    let previousEvals = fixedEvals;
+    const qStage = res.nStages + 1;
+    
     for(let i = 1; i <= res.nStages + 1; ++i) {
         let stage = i;
         let stageDebug = i === res.nStages + 1 ? "Q" : stage;
@@ -77,16 +100,60 @@ module.exports = async function pilInfo(pil, starkStruct, options = {}) {
         nCols[stageName] = nColsStage;
         let nColsBaseField = res.mapSectionsN[stageName];
         let imPols = res.cmPolsMap.filter(p => p.stage == stage && p.imPol);
-        if(i === res.nStages + 1 || (i < res.nStages && !res.imPolsStages)) {
-            console.log(`Columns stage ${stageDebug}: ${nColsStage} -> Columns in the basefield: ${nColsBaseField}`);
-        } else {
-            console.log(`Columns stage ${stageDebug}: ${nColsStage} (${imPols.length} intermediate polynomials) -> Columns in the basefield: ${nColsBaseField} (${imPols.reduce((acc, curr) => acc + curr.dim, 0)} from intermediate polynomials)`);
+        
+        // Calculate per-stage statistics
+        // For stage 1, include constraints from stage 0 as well
+        const stageConstraints = i === 1 
+            ? constraints.filter(c => c.stage === 0 || c.stage === 1)
+            : constraints.filter(c => c.stage === stage);
+        
+        let stageEvals = [];
+        let stageOpeningPoints = new Set();
+        if(res.evMap) {
+            stageEvals = res.evMap.filter(ev => {
+                let symbol;
+                if(ev.type === "const") {
+                    symbol = symbols.find(s => s.polId === ev.id && s.type === "fixed");
+                } else if(ev.type === "cm") {
+                    symbol = symbols.find(s => s.polId === ev.id && s.type === "witness");
+                } else if(ev.type === "custom") {
+                    symbol = symbols.find(s => s.polId === ev.id && s.type === "custom" && s.commitId === ev.commitId);
+                }
+                if(symbol && symbol.stage <= stage) {
+                    stageOpeningPoints.add(ev.openingPos);
+                    return true;
+                }
+                return false;
+            });
         }
+        
+        const cumulativeEvals = stageEvals.length;
+        const newEvals = cumulativeEvals - previousEvals;
+        previousEvals = cumulativeEvals;
+        
+        // Only print if there are columns in this stage
+        if(nColsStage > 0) {
+            // Build constraint info string (only if constraints exist)
+            const constraintInfo = stageConstraints.length > 0 ? ` | Constraints: ${stageConstraints.length}` : '';
+            
+            // Print column info with per-stage stats
+            // Show im pol info if there are intermediate polynomials in this stage
+            if(imPols.length > 0) {
+                const imPolCountLabel = imPols.length === 1 ? "intermediate" : "intermediates";
+                const imPolDim = imPols.reduce((acc, curr) => acc + curr.dim, 0);
+                const imPolDimLabel = imPolDim === 1 ? "intermediate" : "intermediates";
+                console.log(`Columns stage ${stageDebug}: ${nColsStage} (${imPols.length} ${imPolCountLabel}) -> Columns in the basefield: ${nColsBaseField} (${imPolDim} from ${imPolDimLabel})${constraintInfo} | Openings: ${stageOpeningPoints.size} | Evals: ${newEvals}`);
+            } else {
+                console.log(`Columns stage ${stageDebug}: ${nColsStage} -> Columns in the basefield: ${nColsBaseField}${constraintInfo} | Openings: ${stageOpeningPoints.size} | Evals: ${newEvals}`);
+            }
+        }
+        
         if(i < res.nStages + 1) {
             summary += `| Stage${i}: ${nColsBaseField} `;  
         } else if (i == res.nStages + 1) {
             summary += `| StageQ: ${nColsBaseField} `; 
         }
+        
         nColumns += nColsStage;
         nColumnsBaseField += nColsBaseField;
     }
