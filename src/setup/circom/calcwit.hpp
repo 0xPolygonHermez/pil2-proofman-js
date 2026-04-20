@@ -20,9 +20,8 @@ class Circom_CalcWit {
   bool *inputSignalAssigned;
   uint inputSignalAssignedCounter;
 
-  Circom_Circuit *circuit;
-
 public:
+  Circom_Circuit *circuit;
 
   u64* signalValues;
   Circom_Component* componentMemory;
@@ -46,6 +45,7 @@ public:
   void setInputSignal(u64 h, uint i, u64 &val);
   void tryRunCircuit();
   void runCircuit();
+  void reset();
   
   u64 getInputSignalSize(u64 h);
 
@@ -61,8 +61,7 @@ public:
 
   std::string generate_position_array(uint* dimensions, uint size_dimensions, uint index);
 
-private:
-  
+private:  
   uint getInputSignalHashPosition(u64 h);
 
 };

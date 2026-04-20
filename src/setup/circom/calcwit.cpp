@@ -87,6 +87,16 @@ Circom_CalcWit::~Circom_CalcWit() {
   delete[] componentMemory;
 }
 
+void Circom_CalcWit::reset() {
+
+  if (listOfTemplateMessages) { delete[] listOfTemplateMessages; listOfTemplateMessages = nullptr; }
+
+  inputSignalAssignedCounter = get_main_input_signal_no();
+  memset(inputSignalAssigned, 0, inputSignalAssignedCounter * sizeof(bool));
+  signalValues[0] = 1;
+  numThread = 0;
+}
+
 uint Circom_CalcWit::getInputSignalHashPosition(u64 h) {
   uint n = get_size_of_input_hashmap();
   uint pos = (uint)(h % (u64)n);

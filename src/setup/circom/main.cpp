@@ -314,6 +314,28 @@ extern "C" __attribute__((visibility("default"))) void freeCircuit(void* circuit
     freeCircuit(circuit);
 }
 
+extern "C" __attribute__((visibility("default"))) void *initCalcWit(void* circuit_, uint64_t nMutexes)  {
+    Circom_Circuit *circuit = (Circom_Circuit *)circuit_;
+    Circom_CalcWit *ctx = new Circom_CalcWit(circuit, nMutexes);
+    return (void *)ctx;
+}
+
+extern "C" __attribute__((visibility("default"))) void freeCalcWit(void* ctx_)  {
+    Circom_CalcWit *ctx = (Circom_CalcWit *)ctx_;
+    delete ctx;
+}
+
+
+extern "C" __attribute__((visibility("default"))) uint64_t* getWitness2SignalList(void* ctx_) {
+    Circom_CalcWit *ctx = (Circom_CalcWit *)ctx_;
+    return ctx->circuit->witness2SignalList;
+}
+
+extern "C" __attribute__((visibility("default"))) uint64_t* getSignalValues(void* ctx_) {
+    Circom_CalcWit *ctx = (Circom_CalcWit *)ctx_;
+    return ctx->signalValues;
+}
+
 extern "C" __attribute__((visibility("default"))) int getWitnessFinal(void *zkin, char* datFile, void* pWitness, uint64_t nMutexes)  {
     try {
       //-------------------------------------------
@@ -356,21 +378,28 @@ extern "C" __attribute__((visibility("default"))) int getWitnessFinal(void *zkin
     }
 }
 
-extern "C" __attribute__((visibility("default"))) int getWitness(uint64_t *proof, void* circuit_, void* pWitness, uint64_t nMutexes) {
+extern "C" __attribute__((visibility("default"))) int getWitness(uint64_t *proof, void* ctx_) {
     try {
-        Circom_Circuit *circuit = (Circom_Circuit *)circuit_;
-        Circom_CalcWit *ctx = new Circom_CalcWit(circuit, nMutexes);
+        Circom_CalcWit *ctx = (Circom_CalcWit *)ctx_;
+
+        auto t0 = std::chrono::high_resolution_clock::now();
+        ctx->reset();
+        auto t1 = std::chrono::high_resolution_clock::now();
 
         memcpy(&ctx->signalValues[get_main_input_signal_start()], proof, get_main_input_signal_no() * sizeof(uint64_t));
+        auto t2 = std::chrono::high_resolution_clock::now();
+
         ctx->runCircuit();
+        auto t3 = std::chrono::high_resolution_clock::now();
 
-        uint64_t *witness = (uint64_t *)pWitness;
-        uint64_t sizeWitness = get_size_of_witness();
-        for (uint64_t i = 0; i < sizeWitness; i++) {
-            ctx->getWitness(i, witness[i]);
-        }
+        auto us = [](auto a, auto b) {
+            return std::chrono::duration_cast<std::chrono::microseconds>(b - a).count();
+        };
+        std::cerr << "[getWitness] reset=" << us(t0,t1) << "us"
+                  << "  memcpy=" << us(t1,t2) << "us"
+                  << "  runCircuit=" << us(t2,t3) << "us"
+                  << "  total=" << us(t0,t3) << "us\n";
 
-        delete ctx;
         return 0; // success
     } catch (const std::exception &e) {
         std::cerr << "Runtime error: " << e.what() << std::endl;
