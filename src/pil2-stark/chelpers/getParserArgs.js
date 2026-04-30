@@ -1,5 +1,5 @@
 const { assert } = require("chai");
-const { FIELD_EXTENSION } = require("../../constants.js");
+const { FIELD_EXTENSION, RUST_VERIFIER_CHUNK_SIZE } = require("../../constants.js");
 
 const operationsTypeMap = {
     "add": 0,
@@ -31,7 +31,7 @@ const operationsMap = {
     "eval": 12,
 }
 
-module.exports.getParserArgs = function getParserArgs(starkInfo, operations, codeInfo, numbers = [], global = false, verify = false, globalInfo = {}) {
+module.exports.getParserArgs = function getParserArgs(starkInfo, operations, codeInfo, numbers = [], global = false, verify = false, globalInfo = {}, rustChunkSize = RUST_VERIFIER_CHUNK_SIZE, functionName = '') {
 
     var ops = [];
     var args = [];
@@ -64,19 +64,37 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
     }
 
     const verifyRust = [];
+    const verifyRustHelpers = [];
+    
     if(verify) {
-        if(count1d > 0) {
-            verifyRust.push(`    let mut tmp_1 = vec![Goldilocks::ZERO; ${count1d}];`);
-        }
-        if(count3d > 0) {
-            verifyRust.push(`    let mut tmp_3 = vec![CubicExtensionField { value: [Goldilocks::ZERO, Goldilocks::ZERO, Goldilocks::ZERO] }; ${count3d}];`);
-        }
+        // Generate operation lines for all code
+        const operationLines = [];
+        const operationRefs = []; // Track what each operation references
+        
         for (let j = 0; j < code_.length; j++) {
             let line = "";
             const r = code_[j];
+            const refs = new Set(); // Track references in this operation
+            
+            // Helper to track references
+            const trackRef = (op) => {
+                if (op.type === "challenge") refs.add("challenges");
+                else if (op.type === "eval") refs.add("evals");
+                else if (op.type === "const" || op.type === "cm" || op.type === "custom") refs.add("vals");
+                else if (op.type === "public") refs.add("_publics");
+                else if (op.type === "Zi") refs.add("zi");
+                else if (op.type === "xDivXSubXi") refs.add("xdivxsub");
+                else if (op.type === "airvalue") refs.add("air_values");
+                else if (op.type === "proofvalue") refs.add("proof_values");
+                else if (op.type === "airgroupvalue") refs.add("airgroup_values");
+            };
+            
             if(r.op === "copy") {
+                trackRef(r.src[0]);
                 line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[0])};`;
             } else {
+                for (let src of r.src) trackRef(src);
+                
                 if (r.op === "mul") {
                     if (r.src[0].dim === 1 && r.src[1].dim === FIELD_EXTENSION) {
                         line += `    ${getOperationVerify(r.dest)} = ${getOperationVerify(r.src[1])} * ${getOperationVerify(r.src[0])};`;
@@ -98,8 +116,115 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
                     }
                 }
             }
-            verifyRust.push(line);
+            operationLines.push(line);
+            operationRefs.push(refs);
         }
+
+        // Determine if we should chunk (if rustChunkSize is valid and operations exceed chunk size)
+        const shouldChunk = rustChunkSize > 0 && operationLines.length > rustChunkSize;
+        
+        if (shouldChunk) {
+            // Generate chunked helper functions
+            const numChunks = Math.ceil(operationLines.length / rustChunkSize);
+            
+            // Generate helper functions for each chunk
+            for (let chunkIdx = 0; chunkIdx < numChunks; chunkIdx++) {
+                const chunkStart = chunkIdx * rustChunkSize;
+                const chunkEnd = Math.min(chunkStart + rustChunkSize, operationLines.length);
+                const chunkLines = operationLines.slice(chunkStart, chunkEnd);
+                
+                // Determine which parameters are actually used in this chunk
+                const usedParams = new Set();
+                for (let i = chunkStart; i < chunkEnd; i++) {
+                    for (let ref of operationRefs[i]) {
+                        usedParams.add(ref);
+                    }
+                }
+                
+                // Build parameter list based on actual usage
+                const params = [];
+                if (count1d > 0) params.push(`tmp_1: &mut [Goldilocks]`);
+                if (count3d > 0) params.push(`tmp_3: &mut [CubicExtensionField<Goldilocks>]`);
+                
+                if (!global) {
+                    if (usedParams.has("challenges")) params.push(`challenges: &[CubicExtensionField<Goldilocks>]`);
+                    if (usedParams.has("evals")) params.push(`evals: &[CubicExtensionField<Goldilocks>]`);
+                    if (usedParams.has("vals")) params.push(`vals: &[Vec<Goldilocks>]`);
+                    if (usedParams.has("_publics")) params.push(`_publics: &[Goldilocks]`);
+                    if (usedParams.has("zi")) params.push(`zi: &[CubicExtensionField<Goldilocks>]`);
+                    if (usedParams.has("xdivxsub")) params.push(`xdivxsub: &[CubicExtensionField<Goldilocks>]`);
+                    if (usedParams.has("air_values")) params.push(`air_values: &[CubicExtensionField<Goldilocks>]`);
+                    if (usedParams.has("proof_values")) params.push(`proof_values: &[CubicExtensionField<Goldilocks>]`);
+                } else {
+                    if (usedParams.has("challenges")) params.push(`challenges: &[CubicExtensionField<Goldilocks>]`);
+                    if (usedParams.has("_publics")) params.push(`_publics: &[Goldilocks]`);
+                    if (usedParams.has("proof_values")) params.push(`proof_values: &[CubicExtensionField<Goldilocks>]`);
+                    if (usedParams.has("airgroup_values")) params.push(`airgroup_values: &[CubicExtensionField<Goldilocks>]`);
+                }
+                
+                // Generate helper function (top-level, no indentation)
+                const chunkName = functionName ? `${functionName}_chunk_${chunkIdx}` : `chunk_${chunkIdx}`;
+                verifyRustHelpers.push(`#[inline(never)]`);
+                verifyRustHelpers.push(`#[rustfmt::skip]`);
+                verifyRustHelpers.push(`#[allow(clippy::all)]`);
+                verifyRustHelpers.push(`fn ${chunkName}(${params.join(', ')}) {`);
+                verifyRustHelpers.push(...chunkLines);
+                verifyRustHelpers.push(`}\n`);
+            }
+        }
+        
+        // Generate main function body
+        if(count1d > 0) {
+            verifyRust.push(`    let mut tmp_1 = vec![Goldilocks::ZERO; ${count1d}];`);
+        }
+        if(count3d > 0) {
+            verifyRust.push(`    let mut tmp_3 = vec![CubicExtensionField { value: [Goldilocks::ZERO, Goldilocks::ZERO, Goldilocks::ZERO] }; ${count3d}];`);
+        }
+        
+        if (shouldChunk) {
+            // Call chunk helper functions
+            const numChunks = Math.ceil(operationLines.length / rustChunkSize);
+            for (let chunkIdx = 0; chunkIdx < numChunks; chunkIdx++) {
+                const chunkStart = chunkIdx * rustChunkSize;
+                const chunkEnd = Math.min(chunkStart + rustChunkSize, operationLines.length);
+                
+                // Determine which parameters to pass based on chunk usage
+                const usedParams = new Set();
+                for (let i = chunkStart; i < chunkEnd; i++) {
+                    for (let ref of operationRefs[i]) {
+                        usedParams.add(ref);
+                    }
+                }
+                
+                const args = [];
+                if (count1d > 0) args.push(`&mut tmp_1`);
+                if (count3d > 0) args.push(`&mut tmp_3`);
+                
+                if (!global) {
+                    if (usedParams.has("challenges")) args.push(`challenges`);
+                    if (usedParams.has("evals")) args.push(`evals`);
+                    if (usedParams.has("vals")) args.push(`vals`);
+                    if (usedParams.has("_publics")) args.push(`_publics`);
+                    if (usedParams.has("zi")) args.push(`zi`);
+                    if (usedParams.has("xdivxsub")) args.push(`xdivxsub`);
+                    if (usedParams.has("air_values")) args.push(`air_values`);
+                    if (usedParams.has("proof_values")) args.push(`proof_values`);
+                } else {
+                    if (usedParams.has("challenges")) args.push(`challenges`);
+                    if (usedParams.has("_publics")) args.push(`_publics`);
+                    if (usedParams.has("proof_values")) args.push(`proof_values`);
+                    if (usedParams.has("airgroup_values")) args.push(`airgroup_values`);
+                }
+                
+                const chunkName = functionName ? `${functionName}_chunk_${chunkIdx}` : `chunk_${chunkIdx}`;
+                verifyRust.push(`    ${chunkName}(${args.join(', ')});`);
+            }
+        } else {
+            // No chunking - inline all operations directly
+            verifyRust.push(...operationLines);
+        }
+        
+        // Generate return statement
         const destTmp = code_[code_.length - 1].dest;
         if(destTmp.dim == 1) {
             verifyRust.push(`    return tmp_1[${ID1D[destTmp.id]}];`);
@@ -126,7 +251,7 @@ module.exports.getParserArgs = function getParserArgs(starkInfo, operations, cod
         expsInfo.destId = ID3D[destTmp.id];
     } else throw new Error("Unknown");
     
-    return {expsInfo, verifyRust};
+    return {expsInfo, verifyRust: {helpers: verifyRustHelpers, main: verifyRust}};
 
     function pushArgs(r, type, dest) {
         if(dest && !["tmp"].includes(r.type)) throw new Error("Invalid reference type set: " + r.type);

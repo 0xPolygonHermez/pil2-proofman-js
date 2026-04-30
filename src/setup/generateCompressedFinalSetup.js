@@ -20,7 +20,7 @@ const { writeFixedPolsBin, readFixedPolsBin } = require('../pil2-stark/witness_c
 
 module.exports.genCompressedFinalSetup = async function genCompressedFinalSetup(buildDir, name, setupOptions, constRoot, verificationKeys = [], starkInfo, verifierInfo) {
     let template = "vadcop_final_compressed";
-    let verifierName = "vadcop_final.verifier.circom";
+    let verifierName = "vadcop_final_stark.verifier.circom";
     let templateFilename = path.resolve(__dirname,"../../", `node_modules/stark-recurser/src/vadcop/templates/final_compressed.circom.ejs`);
     let filesDir = `${buildDir}/provingKey/${name}/${template}`;
     
