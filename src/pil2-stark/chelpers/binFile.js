@@ -4,6 +4,7 @@ const { createBinFile,
     startWriteSection
      } = require("@iden3/binfileutils");
 const { getParserArgs } = require("./getParserArgs.js");
+const { RUST_VERIFIER_CHUNK_SIZE } = require("../../constants.js");
 
 const CHELPERS_NSECTIONS = 3;
 const CHELPERS_EXPRESSIONS_SECTION = 1;
@@ -407,23 +408,40 @@ async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
 
 
  
-    let {verifyRust: verifyQRust} = getParserArgs(starkInfo, operations, verifierInfo.qVerifier, [], false, true, true);
-    let {verifyRust: verifyFRIRust} = getParserArgs(starkInfo, operations, verifierInfo.queryVerifier, [], false, true);
+    let {verifyRust: verifyQRust} = getParserArgs(starkInfo, operations, verifierInfo.qVerifier, [], false, true, true, RUST_VERIFIER_CHUNK_SIZE, 'q_verify');
+    let {verifyRust: verifyFRIRust} = getParserArgs(starkInfo, operations, verifierInfo.queryVerifier, [], false, true, {}, RUST_VERIFIER_CHUNK_SIZE, 'query_verify');
  
     let verifierRust = [];
     verifierRust.push(`use fields::{Goldilocks, CubicExtensionField, Field, Poseidon${starkInfo.starkStruct.merkleTreeArity * 4}};`);
-    verifierRust.push("use crate::{Boundary, VerifierInfo, stark_verify};\n");
-    verifyQRust.unshift("fn q_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], _publics: &[Goldilocks], zi: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
-    verifyQRust.unshift("#[allow(clippy::all)]");
-    verifyQRust.unshift("#[rustfmt::skip]");
-    verifyQRust.push("}");
-    verifierRust.push(...verifyQRust);
+    verifierRust.push("use crate::{Boundary, VerifierInfo, stark_verify};");
+    verifierRust.push("use proofman_util::VadcopFinalProof;\n");
+    
+    // Add q_verify helpers if any
+    if (verifyQRust.helpers && verifyQRust.helpers.length > 0) {
+        verifierRust.push(...verifyQRust.helpers);
+    }
+    
+    // Add q_verify main function
+    const qBody = verifyQRust.main || verifyQRust;
+    qBody.unshift("fn q_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], _publics: &[Goldilocks], zi: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
+    qBody.unshift("#[allow(clippy::all)]");
+    qBody.unshift("#[rustfmt::skip]");
+    qBody.push("}");
+    verifierRust.push(...qBody);
     verifierRust.push("\n");
-    verifyFRIRust.unshift("fn query_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], vals: &[Vec<Goldilocks>], xdivxsub: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
-    verifyFRIRust.unshift("#[allow(clippy::all)]");
-    verifyFRIRust.unshift("#[rustfmt::skip]")
-    verifyFRIRust.push("}\n");
-    verifierRust.push(...verifyFRIRust);
+    
+    // Add query_verify helpers if any
+    if (verifyFRIRust.helpers && verifyFRIRust.helpers.length > 0) {
+        verifierRust.push(...verifyFRIRust.helpers);
+    }
+    
+    // Add query_verify main function
+    const friBody = verifyFRIRust.main || verifyFRIRust;
+    friBody.unshift("fn query_verify(challenges: &[CubicExtensionField<Goldilocks>], evals: &[CubicExtensionField<Goldilocks>], vals: &[Vec<Goldilocks>], xdivxsub: &[CubicExtensionField<Goldilocks>]) -> CubicExtensionField<Goldilocks> {");
+    friBody.unshift("#[allow(clippy::all)]");
+    friBody.unshift("#[rustfmt::skip]")
+    friBody.push("}\n");
+    verifierRust.push(...friBody);
     let verify = [];
     verify.push("#[rustfmt::skip]")
     verify.push("fn verifier_info() -> VerifierInfo {");
@@ -465,7 +483,10 @@ async function prepareVerifierRust(starkInfo, verifierInfo, verkeyRoot) {
     verify.push("        q_index: " + qEvIndex + ",");
     verify.push("    }");
     verify.push("}\n");
-    verify.push("pub fn verify(proof: &[u8], vk: &[u8]) -> bool {");
+    verify.push("pub fn verify(proof: &VadcopFinalProof, vk: &[u8]) -> bool {");
+    verify.push(`    stark_verify::<Poseidon${starkInfo.starkStruct.merkleTreeArity * 4}, ${starkInfo.starkStruct.merkleTreeArity * 4}>(&proof.proof_with_publics(), vk, &verifier_info(), q_verify, query_verify)`);
+    verify.push("}\n");
+    verify.push("pub fn verify_bytes(proof: &[u8], vk: &[u8]) -> bool {");
     verify.push(`    stark_verify::<Poseidon${starkInfo.starkStruct.merkleTreeArity * 4}, ${starkInfo.starkStruct.merkleTreeArity * 4}>(proof, vk, &verifier_info(), q_verify, query_verify)`);
     verify.push("}\n");
 
