@@ -3,7 +3,7 @@ const exec = util.promisify(require('child_process').exec);
 const JSONbig = require('json-bigint')({ useNativeBigInt: true, alwaysParseAsBig: true });
 const fs = require('fs');
 const ffjavascript = require("ffjavascript");
-
+const { getFixedPolsPil2 } = require('../pil2-stark/pil_info/piloutInfo.js');
 const { plonk2pil } = require('stark-recurser/src/circom2pil/plonk2pil.js');
 const { genCircom } = require('stark-recurser/src/gencircom.js');
 const pil2circom = require('stark-recurser/src/pil2circom/pil2circom.js');
@@ -77,6 +77,7 @@ module.exports.genCompressedFinalSetup = async function genCompressedFinalSetup(
     let fixedInfo = {};
     await readFixedPolsBin(fixedInfo, `${buildDir}/build/${template}.fixed.bin`);
     const fixedCols = generateFixedCols(air.symbols.filter(s => s.airGroupId == 0), air.numRows);
+    await getFixedPolsPil2(airout.airGroups[0].name, air, fixedCols, fixedInfo);
 
     await fixedCols.saveToFile(`${filesDir}/${template}.const`);
     
