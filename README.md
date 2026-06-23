@@ -18,7 +18,7 @@ To generate a proof that a computation was executed correctly, you will need to 
 
 1. Define one or several AIRs of your computations using an Airout formatted file. See [PIL2 compiler](https://github.com/0xPolygonHermez/pil2-compiler) for more info.
 2. Define your executors implementing a class derived from witness_calculator_component to write you execution trace/s for your computation. 
-3. Define a configuration of your execution plan defining the sued executors, used libraries, prover and verifier.
+3. Define a configuration of your execution plan defining the used executors, used libraries, prover and verifier.
 4. Execute your computation and get a new proof.
 
 
